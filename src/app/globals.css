@@ -1,0 +1,238 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* ─── SpliceForge Light Theme (default) ─── */
+:root {
+  --background: #FFFFFF;
+  --foreground: #0F172A;
+  --card: #F8FAFC;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #0284C7;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #1E293B;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent: #E2E8F0;
+  --accent-foreground: #1E293B;
+  --destructive: #DC2626;
+  --border: rgba(15, 23, 42, 0.12);
+  --input: #E2E8F0;
+  --ring: #0284C7;
+  --radius: 0.5rem;
+
+  --chart-1: #0284C7;
+  --chart-2: #059669;
+  --chart-3: #4F46E5;
+  --chart-4: #D97706;
+  --chart-5: #DC2626;
+
+  --sidebar: #F8FAFC;
+  --sidebar-foreground: #0F172A;
+  --sidebar-primary: #0284C7;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #E2E8F0;
+  --sidebar-accent-foreground: #1E293B;
+  --sidebar-border: rgba(15, 23, 42, 0.12);
+  --sidebar-ring: #0284C7;
+
+  /* SpliceForge brand tokens */
+  --fm-cyan: #00E5FF;
+  --fm-cyan-soft: #22D3EE;
+  --fm-electric: #3DF5A3;
+  --fm-blue: #2563EB;
+  --fm-indigo: #4F46E5;
+  --fm-bg-0: #05070C;
+  --fm-bg-1: #0A0F1A;
+  --fm-bg-2: #0F1624;
+  --fm-bg-3: #161F30;
+  --fm-bg-4: #1F2B40;
+  --fm-fg-1: #F1F5F9;
+  --fm-fg-2: #CBD5E1;
+  --fm-fg-3: #94A3B8;
+  --fm-fg-4: #64748B;
+  --fm-border: rgba(148, 184, 255, 0.10);
+  --fm-border-2: rgba(148, 184, 255, 0.18);
+  --fm-border-glow: rgba(0, 229, 255, 0.35);
+}
+
+/* ─── SpliceForge Dark Theme (fiber-optic inspired) ─── */
+.dark {
+  --background: #05070C;
+  --foreground: #F1F5F9;
+  --card: #0F1624;
+  --card-foreground: #F1F5F9;
+  --popover: #0A0F1A;
+  --popover-foreground: #F1F5F9;
+  --primary: #00E5FF;
+  --primary-foreground: #05070C;
+  --secondary: #161F30;
+  --secondary-foreground: #F1F5F9;
+  --muted: #161F30;
+  --muted-foreground: #94A3B8;
+  --accent: #1F2B40;
+  --accent-foreground: #F1F5F9;
+  --destructive: #EF4444;
+  --border: rgba(148, 184, 255, 0.12);
+  --input: #1F2B40;
+  --ring: #00E5FF;
+
+  --chart-1: #00E5FF;
+  --chart-2: #3DF5A3;
+  --chart-3: #4F46E5;
+  --chart-4: #F59E0B;
+  --chart-5: #EF4444;
+
+  --sidebar: #080D18;
+  --sidebar-foreground: #F1F5F9;
+  --sidebar-primary: #00E5FF;
+  --sidebar-primary-foreground: #05070C;
+  --sidebar-accent: #1F2B40;
+  --sidebar-accent-foreground: #F1F5F9;
+  --sidebar-border: rgba(148, 184, 255, 0.12);
+  --sidebar-ring: #00E5FF;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(148,184,255,0.2); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(148,184,255,0.35); }
+
+/* ─── Focus ─── */
+button:focus-visible { outline: 2px solid rgba(0,229,255,0.6); outline-offset: 2px; }
+input:focus { border-color: rgba(0,229,255,0.5) !important; box-shadow: 0 0 0 3px rgba(0,229,255,0.15) !important; outline: none; }
+
+/* ─── Animations ─── */
+@keyframes fmPulse {
+  0%   { transform: scale(1); opacity: 0.6; }
+  70%  { transform: scale(2.2); opacity: 0; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@keyframes flyOut {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes flowDash {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -24; }
+}
+@keyframes splice-flash {
+  0%   { stroke: #22c55e; stroke-width: 4; filter: drop-shadow(0 0 6px rgba(34,197,94,0.9)); }
+  100% { stroke: #22c55e; stroke-width: 2; filter: drop-shadow(0 0 0 rgba(34,197,94,0)); }
+}
+.splice-flash { animation: splice-flash 600ms ease-out; }
+
+/* ─── ReactFlow premium overrides ─── */
+.react-flow { background: transparent !important; }
+.react-flow__background { background: transparent !important; }
+
+.react-flow__controls {
+  background: linear-gradient(180deg, rgba(15,22,36,0.96), rgba(10,15,26,0.98)) !important;
+  border: 1px solid rgba(148,184,255,0.18) !important;
+  border-radius: 10px !important;
+  overflow: hidden !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+.react-flow__controls-button {
+  background: transparent !important;
+  border-color: rgba(148,184,255,0.10) !important;
+  color: #94A3B8 !important;
+  fill: #94A3B8 !important;
+}
+.react-flow__controls-button:hover {
+  background: rgba(148,184,255,0.06) !important;
+  color: #F1F5F9 !important;
+  fill: #F1F5F9 !important;
+}
+.react-flow__controls-button svg { fill: currentColor !important; }
+
+.react-flow__minimap {
+  background: linear-gradient(180deg, rgba(15,22,36,0.96), rgba(10,15,26,0.98)) !important;
+  border: 1px solid rgba(148,184,255,0.18) !important;
+  border-radius: 10px !important;
+  overflow: hidden !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.55) !important;
+}
+.react-flow__minimap-mask { fill: rgba(0,229,255,0.05) !important; }
+.react-flow__minimap-node { fill: rgba(0,229,255,0.25) !important; }
+
+/* ─── Port handles ─── */
+.react-flow__handle.port-handle {
+  transition: box-shadow 120ms ease, transform 120ms ease;
+}
+.react-flow__handle.port-handle:hover {
+  box-shadow: 0 0 0 4px rgba(0, 229, 255, 0.3);
+}
+
+/* ─── Dialog overrides ─── */
+[data-slot="dialog-overlay"] {
+  background: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(4px);
+}
+.dark [data-slot="dialog-content"] {
+  background: #0A0F1A !important;
+  border: 1px solid rgba(148,184,255,0.18) !important;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
