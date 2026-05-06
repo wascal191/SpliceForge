@@ -223,21 +223,24 @@ export function ExportDialog() {
     setBusy(key);
     try {
       const { dataUrl } = await capture(scope);
-      const win = window.open("", "_blank");
+      // Open with noopener/noreferrer so the popup cannot navigate the opener,
+      // and build the document via DOM construction (no string interpolation
+      // of `${dataUrl}` into HTML — eliminates a latent XSS sink, V-09).
+      const win = window.open("", "_blank", "noopener,noreferrer");
       if (!win) return;
-      win.document.write(`
-        <html><head><title>SpliceForge</title>
-        <style>
-          *{margin:0;padding:0;box-sizing:border-box}
-          body{background:#fff;display:flex;justify-content:center;align-items:center;min-height:100vh}
-          img{max-width:100%;max-height:100vh;object-fit:contain}
-          @media print{body{margin:0}img{width:100%;height:auto;max-height:none}}
-        </style></head><body>
-        <img src="${dataUrl}"/>
-        <script>window.onload=function(){window.print()}<\/script>
-        </body></html>
-      `);
-      win.document.close();
+      const doc = win.document;
+      doc.title = "SpliceForge";
+      const style = doc.createElement("style");
+      style.textContent =
+        "*{margin:0;padding:0;box-sizing:border-box}" +
+        "body{background:#fff;display:flex;justify-content:center;align-items:center;min-height:100vh}" +
+        "img{max-width:100%;max-height:100vh;object-fit:contain}" +
+        "@media print{body{margin:0}img{width:100%;height:auto;max-height:none}}";
+      doc.head.appendChild(style);
+      const img = doc.createElement("img");
+      img.onload = () => win.print();
+      img.src = dataUrl; // assigning to .src is safe; the value is treated as a URL, not HTML
+      doc.body.appendChild(img);
     } finally {
       setBusy(null);
     }

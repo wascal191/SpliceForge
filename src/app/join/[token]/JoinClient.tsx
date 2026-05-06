@@ -58,13 +58,20 @@ export function JoinClient({
     setLoading(true);
     setError(null);
     try {
+      const trimmedName = fullName.trim();
+      if (trimmedName.length < 1 || trimmedName.length > 120) throw new Error("Full name is too long or empty");
+      if (password.length < 8) throw new Error("Password must be at least 8 characters");
+
       const supabase = createClient();
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { full_name: fullName.trim(), joining_token: token },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          // joining_token in user_metadata is no longer used by the server.
+          // The server-side callback only trusts app_metadata for org-binding;
+          // the actual join is performed via joinOrganizationByToken below.
+          data: { full_name: trimmedName },
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/join/${encodeURIComponent(token)}`,
         },
       });
       if (authError) throw authError;

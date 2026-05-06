@@ -8,6 +8,27 @@ import { createClient } from "@/lib/supabase/client";
 const F = "var(--font-inter), sans-serif";
 const FM = "var(--font-geist-mono), monospace";
 
+function friendlyAuthError(err: unknown): string {
+  const msg = err instanceof Error ? err.message.toLowerCase() : "";
+  if (msg.includes("invalid login credentials") || msg.includes("invalid email or password"))
+    return "Incorrect email or password. Please try again.";
+  if (msg.includes("email not confirmed"))
+    return "Please confirm your email address before signing in. Check your inbox for the confirmation link.";
+  if (msg.includes("too many requests") || msg.includes("rate limit"))
+    return "Too many login attempts. Please wait a moment and try again.";
+  if (msg.includes("user not found") || msg.includes("no user found"))
+    return "No account found with that email address.";
+  return "Login failed. Please check your email and password and try again.";
+}
+
+// Reject anything that isn't a single-leading-slash same-origin path.
+// Blocks "//evil.com", "https://...", "\\evil.com" and other open-redirect tricks.
+function safeNext(raw: string | null): string {
+  if (!raw) return "/dashboard";
+  if (!/^\/[^/\\]/.test(raw)) return "/dashboard";
+  return raw;
+}
+
 export default function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -22,17 +43,17 @@ export default function LoginContent() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (authError) throw authError;
+      if (!data.session) throw new Error("Incorrect email or password. Please try again.");
 
-      const next = searchParams.get("next");
-      router.push(next ?? "/dashboard");
+      router.push(safeNext(searchParams.get("next")));
       router.refresh();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(friendlyAuthError(err));
     } finally {
       setLoading(false);
     }

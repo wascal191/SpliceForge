@@ -5,7 +5,19 @@ import { useRouter } from "next/navigation";
 import { createProject, deleteProject, updateProject } from "@/lib/actions/projects";
 import { getBedsheets, createBedsheet, renameBedsheet, deleteBedsheet } from "@/lib/actions/bedsheets";
 import { getOrgMembers, updateMemberRole, removeMember, type OrgMember } from "@/lib/actions/organizations";
-import { createInviteToken, getInviteToken, revokeInviteToken, type OrgInvite } from "@/lib/actions/invites";
+import { createInviteToken, getInviteToken, revokeInviteToken } from "@/lib/actions/invites";
+
+// Local UI shape: only the freshly-created invite carries the raw token.
+// Once a session reloads, the API only returns metadata (the token hash is
+// not reversible), so the UI shows a "regenerate to copy" affordance.
+type InviteUI = {
+  id: string;
+  organization_id: string;
+  created_by: string;
+  created_at: string;
+  expires_at: string;
+  token?: string;
+};
 import { createClient } from "@/lib/supabase/client";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -377,7 +389,7 @@ export function DashboardClient({
   // team view state
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
-  const [invite, setInvite] = useState<OrgInvite | null | "none">("none");
+  const [invite, setInvite] = useState<InviteUI | null | "none">("none");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [teamError, setTeamError] = useState<string | null>(null);
@@ -734,26 +746,48 @@ export function DashboardClient({
                   <div style={{ fontFamily: FM, fontSize: 9.5, letterSpacing: "0.16em", color: "#64748B", textTransform: "uppercase", marginBottom: 12 }}>Invite Link</div>
                   {invite && invite !== "none" ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ flex: 1, background: "rgba(148,184,255,0.05)", border: "1px solid rgba(148,184,255,0.14)", borderRadius: 7, padding: "8px 12px", fontFamily: FM, fontSize: 11, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {typeof window !== "undefined" ? `${window.location.origin}/join/${invite.token}` : `/join/${invite.token}`}
+                      {invite.token ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ flex: 1, background: "rgba(148,184,255,0.05)", border: "1px solid rgba(148,184,255,0.14)", borderRadius: 7, padding: "8px 12px", fontFamily: FM, fontSize: 11, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {typeof window !== "undefined" ? `${window.location.origin}/join/${invite.token}` : `/join/${invite.token}`}
+                          </div>
+                          <button
+                            onClick={() => copyInviteLink(invite.token!)}
+                            style={{ flexShrink: 0, height: 36, padding: "0 14px", background: copied ? "rgba(61,245,163,0.15)" : "rgba(0,229,255,0.1)", border: `1px solid ${copied ? "rgba(61,245,163,0.3)" : "rgba(0,229,255,0.25)"}`, borderRadius: 7, color: copied ? "#3DF5A3" : "#00E5FF", fontFamily: F, fontWeight: 600, fontSize: 12, cursor: "pointer" }}
+                          >
+                            {copied ? "Copied!" : "Copy"}
+                          </button>
+                          <button
+                            onClick={handleRevokeInvite}
+                            disabled={inviteLoading}
+                            style={{ flexShrink: 0, height: 36, padding: "0 12px", background: "transparent", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 7, color: "#F87171", fontFamily: F, fontSize: 12, cursor: "pointer" }}
+                          >
+                            Revoke
+                          </button>
                         </div>
-                        <button
-                          onClick={() => copyInviteLink(invite.token)}
-                          style={{ flexShrink: 0, height: 36, padding: "0 14px", background: copied ? "rgba(61,245,163,0.15)" : "rgba(0,229,255,0.1)", border: `1px solid ${copied ? "rgba(61,245,163,0.3)" : "rgba(0,229,255,0.25)"}`, borderRadius: 7, color: copied ? "#3DF5A3" : "#00E5FF", fontFamily: F, fontWeight: 600, fontSize: 12, cursor: "pointer" }}
-                        >
-                          {copied ? "Copied!" : "Copy"}
-                        </button>
-                        <button
-                          onClick={handleRevokeInvite}
-                          disabled={inviteLoading}
-                          style={{ flexShrink: 0, height: 36, padding: "0 12px", background: "transparent", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 7, color: "#F87171", fontFamily: F, fontSize: 12, cursor: "pointer" }}
-                        >
-                          Revoke
-                        </button>
-                      </div>
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <p style={{ fontFamily: F, fontSize: 12, color: "#64748B", margin: 0, flex: 1 }}>
+                            An active invite link exists. For security, the URL is not stored on the server — regenerate to get a fresh link.
+                          </p>
+                          <button
+                            onClick={handleGenerateInvite}
+                            disabled={inviteLoading}
+                            style={{ flexShrink: 0, height: 36, padding: "0 14px", background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.25)", borderRadius: 7, color: "#00E5FF", fontFamily: F, fontWeight: 600, fontSize: 12, cursor: "pointer" }}
+                          >
+                            {inviteLoading ? "…" : "Regenerate"}
+                          </button>
+                          <button
+                            onClick={handleRevokeInvite}
+                            disabled={inviteLoading}
+                            style={{ flexShrink: 0, height: 36, padding: "0 12px", background: "transparent", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 7, color: "#F87171", fontFamily: F, fontSize: 12, cursor: "pointer" }}
+                          >
+                            Revoke
+                          </button>
+                        </div>
+                      )}
                       <p style={{ fontFamily: F, fontSize: 11.5, color: "#64748B", margin: 0 }}>
-                        Share this link with anyone you want to add. They will join as <strong style={{ color: "#CBD5E1" }}>Editor</strong>.
+                        Share this link with anyone you want to add. They will join as <strong style={{ color: "#CBD5E1" }}>Editor</strong>. Expires {new Date(invite.expires_at).toLocaleDateString()}.
                       </p>
                     </div>
                   ) : invite === null ? (

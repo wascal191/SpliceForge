@@ -25,15 +25,26 @@ export default function SignupPage() {
     setError(null);
     setLoading(true);
     try {
+      const trimmedName = fullName.trim();
+      const trimmedOrg = orgName.trim();
+      const trimmedPhone = phone.trim();
+      if (trimmedName.length < 1 || trimmedName.length > 120) throw new Error("Full name is too long or empty");
+      if (trimmedOrg.length < 1 || trimmedOrg.length > 120) throw new Error("Organization name is too long or empty");
+      if (trimmedPhone.length > 0 && !/^[+0-9 ()\-]{1,32}$/.test(trimmedPhone)) throw new Error("Invalid phone number");
+      if (password.length < 8) throw new Error("Password must be at least 8 characters");
+
       const supabase = createClient();
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            full_name: fullName.trim(),
-            company_name: orgName.trim(),
-            phone: phone.trim(),
+            // user_metadata is attacker-controllable post-confirmation; only
+            // include display fields here. Authorization-bearing data must
+            // never live here (see auth/callback).
+            full_name: trimmedName,
+            company_name: trimmedOrg,
+            phone: trimmedPhone,
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },

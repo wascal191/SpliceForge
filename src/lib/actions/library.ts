@@ -1,7 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentOrganization } from "@/lib/actions/organizations";
+import { requireAuthContext } from "@/lib/guards";
+import { LibraryCableInput, Uuid, parseOrFail } from "@/lib/validation";
+import { fail } from "@/lib/errors";
 
 export type LibraryCable = {
   id: string;
@@ -13,16 +15,24 @@ export type LibraryCable = {
 };
 
 export async function getLibraryCables(): Promise<LibraryCable[]> {
-  const supabase = await createClient();
-  const org = await getCurrentOrganization();
-  if (!org) return [];
+  let ctx;
+  try {
+    ctx = await requireAuthContext();
+  } catch {
+    return [];
+  }
 
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("library_cables")
     .select("*")
-    .eq("organization_id", org.id)
+    .eq("organization_id", ctx.orgId)
     .order("created_at", { ascending: false });
-  if (error) return [];
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error("[library.getLibraryCables]", error);
+    return [];
+  }
   return data;
 }
 
@@ -32,27 +42,38 @@ export async function saveToLibrary(
   colorScheme: string,
   moduleFiberCount?: number
 ): Promise<LibraryCable> {
-  const supabase = await createClient();
-  const org = await getCurrentOrganization();
-  if (!org) throw new Error("No organization found");
+  const parsed = parseOrFail(
+    LibraryCableInput,
+    { name, fiberCount, colorScheme, moduleFiberCount },
+    "saveToLibrary"
+  );
 
+  const ctx = await requireAuthContext();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("library_cables")
     .insert({
-      name,
-      fiber_count: fiberCount,
-      color_scheme: colorScheme,
-      module_fiber_count: moduleFiberCount ?? null,
-      organization_id: org.id,
+      name: parsed.name,
+      fiber_count: parsed.fiberCount,
+      color_scheme: parsed.colorScheme,
+      module_fiber_count: parsed.moduleFiberCount ?? null,
+      organization_id: ctx.orgId,
     })
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) fail("library.saveToLibrary", error, "Could not save to library");
   return data;
 }
 
 export async function deleteLibraryCable(id: string) {
+  const cleanId = parseOrFail(Uuid, id, "deleteLibraryCable.id");
+  const ctx = await requireAuthContext();
+
   const supabase = await createClient();
-  const { error } = await supabase.from("library_cables").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  const { error } = await supabase
+    .from("library_cables")
+    .delete()
+    .eq("id", cleanId)
+    .eq("organization_id", ctx.orgId);
+  if (error) fail("library.deleteLibraryCable", error, "Could not delete library cable");
 }
