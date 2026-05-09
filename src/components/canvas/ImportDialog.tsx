@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import type { Node, Edge } from "@xyflow/react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -97,16 +97,33 @@ export function ImportDialog({ pageId, setNodes, setEdges }: Props) {
 
     try {
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf);
 
-      const elemSheet = wb.Sheets["Elements"];
-      const connSheet = wb.Sheets["Connections"];
+      function sheetToJson<T>(sheetName: string): T[] {
+        const ws = wb.getWorksheet(sheetName);
+        if (!ws) return [];
+        const result: T[] = [];
+        let headers: string[] = [];
+        ws.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) {
+            headers = (row.values as Array<string | undefined>).slice(1).map((h) => String(h ?? ""));
+          } else {
+            const obj: Record<string, unknown> = {};
+            (row.values as unknown[]).slice(1).forEach((val, i) => {
+              obj[headers[i]] = val ?? "";
+            });
+            result.push(obj as T);
+          }
+        });
+        return result;
+      }
 
-      if (!elemSheet) { errs.push('Sheet "Elements" not found. Export a canvas first to get the correct format.'); setErrors(errs); setBusy(false); return; }
-      if (!connSheet) { errs.push('Sheet "Connections" not found.'); setErrors(errs); setBusy(false); return; }
+      if (!wb.getWorksheet("Elements")) { errs.push('Sheet "Elements" not found. Export a canvas first to get the correct format.'); setErrors(errs); setBusy(false); return; }
+      if (!wb.getWorksheet("Connections")) { errs.push('Sheet "Connections" not found.'); setErrors(errs); setBusy(false); return; }
 
-      const elemRows = XLSX.utils.sheet_to_json<ElementRecord>(elemSheet, { defval: "" });
-      const connRows = XLSX.utils.sheet_to_json<ConnectionRecord>(connSheet, { defval: "" });
+      const elemRows = sheetToJson<ElementRecord>("Elements");
+      const connRows = sheetToJson<ConnectionRecord>("Connections");
 
       if (elemRows.length === 0) { errs.push("Elements sheet is empty."); setErrors(errs); setBusy(false); return; }
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useReactFlow, getNodesBounds, getViewportForBounds } from "@xyflow/react";
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useCanvasStore } from "@/store/canvasStore";
@@ -139,7 +139,7 @@ export function ExportDialog() {
     }
   }
 
-  function exportXLSX() {
+  async function exportXLSX() {
     setBusy("xlsx");
     try {
       const allNodes = getNodes();
@@ -208,11 +208,28 @@ export function ExportDialog() {
           };
         });
 
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(elements), "Elements");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(connections), "Connections");
+      const wb = new ExcelJS.Workbook();
+
+      const elemSheet = wb.addWorksheet("Elements");
+      if (elements.length > 0) {
+        elemSheet.columns = Object.keys(elements[0]).map((key) => ({ header: key, key }));
+        elemSheet.addRows(elements);
+      }
+
+      const connSheet = wb.addWorksheet("Connections");
+      if (connections.length > 0) {
+        connSheet.columns = Object.keys(connections[0]).map((key) => ({ header: key, key }));
+        connSheet.addRows(connections);
+      }
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
       const fname = xlsxScope === "traced" && hasTrace ? "spliceforge-trace.xlsx" : "spliceforge.xlsx";
-      XLSX.writeFile(wb, fname);
+      download(url, fname);
+      URL.revokeObjectURL(url);
     } finally {
       setBusy(null);
     }
