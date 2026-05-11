@@ -11,7 +11,7 @@ type CanvasStore = {
   traceEntries: Map<string, string>;    // edgeId → hex color (source of truth)
   tracedNodeIds: Set<string>;
   tracedEdgeIds: Set<string>;
-  tracedNodeColors: Map<string, string>; // nodeId → hex color
+  tracedNodeColors: Record<string, string>; // nodeId → hex color
   // ui toggles
   bwMode: boolean;
   darkMode: boolean;
@@ -53,6 +53,18 @@ type CanvasStore = {
   cursorPos: { x: number; y: number };
   setCursorPos: (pos: { x: number; y: number }) => void;
 
+  // ── Geo / Map view ──────────────────────────────────────────────────────
+  view: "schematic" | "map";
+  setView: (v: "schematic" | "map") => void;
+  mapViewport: { lng: number; lat: number; zoom: number } | null;
+  setMapViewport: (v: { lng: number; lat: number; zoom: number }) => void;
+  /** Element currently being placed on the map via the Localize workflow. */
+  geoLocalizingId: string | null;
+  setGeoLocalizingId: (id: string | null) => void;
+  /** Incremented after a geo save so FiberCanvas knows to reload from DB. */
+  geoVersion: number;
+  bumpGeoVersion: () => void;
+
   // Organization context (hydrated after login)
   currentOrganizationId: string | null;
   currentOrganization: { id: string; name: string; plan: string } | null;
@@ -76,7 +88,7 @@ type CanvasStore = {
   toggleTraceEntry: (edgeId: string, color: string) => void;
   batchAddTraceEntries: (entries: [string, string][]) => void;
   removeTraceColor: (color: string) => void;
-  setTracedNodeColors: (colors: Map<string, string>) => void;
+  setTracedNodeColors: (colors: Record<string, string>) => void;
   clearTrace: () => void;
   toggleBwMode: () => void;
   toggleDarkMode: () => void;
@@ -111,7 +123,7 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
   traceEntries: new Map(),
   tracedNodeIds: new Set(),
   tracedEdgeIds: new Set(),
-  tracedNodeColors: new Map(),
+  tracedNodeColors: {},
   bwMode: false,
   darkMode: true,
   searchOpen: false,
@@ -179,7 +191,7 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
       traceEntries: new Map(),
       tracedNodeIds: new Set(),
       tracedEdgeIds: new Set(),
-      tracedNodeColors: new Map(),
+      tracedNodeColors: {},
     }),
   toggleBwMode: () => set((s) => ({ bwMode: !s.bwMode })),
   toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),
@@ -222,6 +234,15 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
 
   cursorPos: { x: 0, y: 0 },
   setCursorPos: (cursorPos) => set({ cursorPos }),
+
+  view: "schematic",
+  setView: (view) => set({ view }),
+  mapViewport: null,
+  setMapViewport: (mapViewport) => set({ mapViewport }),
+  geoLocalizingId: null,
+  setGeoLocalizingId: (geoLocalizingId) => set({ geoLocalizingId }),
+  geoVersion: 0,
+  bumpGeoVersion: () => set((s) => ({ geoVersion: s.geoVersion + 1 })),
 
   currentOrganizationId: null,
   currentOrganization: null,

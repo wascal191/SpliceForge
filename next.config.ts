@@ -5,13 +5,26 @@ const isDev = process.env.NODE_ENV === "development";
 // In production: strict CSP.
 // In development: relax script-src so Turbopack's HMR inline scripts can run.
 // Without this, React won't hydrate in dev and forms submit as native HTML POSTs.
+// MapLibre GL tile sources — extend if you add additional providers.
+const tileHosts = [
+  "https://*.stadiamaps.com",      // Stadia Maps (free on localhost, key for prod)
+  "https://tiles.openfreemap.org", // OpenFreeMap — no key required
+  "https://*.openfreemap.org",
+  "https://demotiles.maplibre.org", // MapLibre demo fallback
+].join(" ");
+
 const csp = [
   "default-src 'self'",
   isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  // blob: needed for MapLibre raster tile workers; tile CDNs for raster sprites/glyphs
+  `img-src 'self' data: blob: ${tileHosts}`,
+  `font-src 'self' data: ${tileHosts}`,
+  // MapLibre fetches style JSON + vector/raster tiles from external CDNs
+  `connect-src 'self' https://*.supabase.co wss://*.supabase.co ${tileHosts}`,
+  // MapLibre runs its rendering on a blob: Web Worker
+  "worker-src blob:",
+  "child-src blob:",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

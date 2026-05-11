@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { useCanvasStore } from "@/store/canvasStore";
 import type { FiberPort } from "@/types/fiber";
 import type { Node } from "@xyflow/react";
+import { generateKmz } from "@/lib/geo/kmz";
+import { generateGeoJson } from "@/lib/geo/geojson";
 
 const PADDING = 120;
 
@@ -263,6 +265,54 @@ export function ExportDialog() {
     }
   }
 
+  // Count elements that have geo data (for the "N of M have locations" note)
+  const geoCount = getNodes().filter((n) => {
+    const geo = (n.data as { geo?: { lat?: unknown; path?: unknown } }).geo;
+    return geo?.lat != null || (Array.isArray(geo?.path) && (geo.path as unknown[]).length >= 2);
+  }).length;
+  const totalCount = getNodes().length;
+
+  async function exportKmz(scope: Scope) {
+    const key = `kmz-${scope}`;
+    setBusy(key);
+    try {
+      const blob = await generateKmz({
+        bedsheetName: "SpliceForge",
+        pageName: "Export",
+        nodes: getNodes(),
+        tracedNodeIds,
+        tracedNodeColors: useCanvasStore.getState().tracedNodeColors,
+        scope,
+      });
+      const url = URL.createObjectURL(blob);
+      const fname = scope === "traced" ? "spliceforge-trace.kmz" : "spliceforge.kmz";
+      download(url, fname);
+      URL.revokeObjectURL(url);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function exportGeoJson(scope: Scope) {
+    const key = `geojson-${scope}`;
+    setBusy(key);
+    try {
+      const json = generateGeoJson({
+        nodes: getNodes(),
+        tracedNodeIds,
+        tracedNodeColors: useCanvasStore.getState().tracedNodeColors,
+        scope,
+      });
+      const blob = new Blob([json], { type: "application/geo+json" });
+      const url = URL.createObjectURL(blob);
+      const fname = scope === "traced" ? "spliceforge-trace.geojson" : "spliceforge.geojson";
+      download(url, fname);
+      URL.revokeObjectURL(url);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const isBusy = !!busy;
 
   return (
@@ -348,6 +398,49 @@ export function ExportDialog() {
             <Button size="sm" variant="outline" disabled={isBusy} onClick={exportXLSX}>
               {busy === "xlsx" ? "…" : "Export XLSX"}
             </Button>
+          </section>
+
+          <div className="h-px bg-border" />
+
+          {/* ── GIS EXPORT ── */}
+          <section className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">GIS / Map Export</p>
+              {totalCount > 0 && (
+                <span className="text-[10px] text-muted-foreground">
+                  {geoCount}/{totalCount} located
+                </span>
+              )}
+            </div>
+            {geoCount === 0 ? (
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                No elements have geographic locations yet. Use "Set location on map…" from the canvas context menu.
+              </p>
+            ) : (
+              <>
+                {hasTrace && (
+                  <section className="flex flex-col gap-2 rounded-lg border-2 border-primary/40 bg-primary/5 p-3">
+                    <p className="text-xs font-bold uppercase tracking-wide text-primary">Traced Path</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" className="flex-1" disabled={isBusy} onClick={() => exportKmz("traced")}>
+                        {busy === "kmz-traced" ? "…" : "KMZ"}
+                      </Button>
+                      <Button size="sm" variant="outline" className="flex-1" disabled={isBusy} onClick={() => exportGeoJson("traced")}>
+                        {busy === "geojson-traced" ? "…" : "GeoJSON"}
+                      </Button>
+                    </div>
+                  </section>
+                )}
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="flex-1" disabled={isBusy} onClick={() => exportKmz("all")}>
+                    {busy === "kmz-all" ? "…" : "KMZ (All)"}
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1" disabled={isBusy} onClick={() => exportGeoJson("all")}>
+                    {busy === "geojson-all" ? "…" : "GeoJSON (All)"}
+                  </Button>
+                </div>
+              </>
+            )}
           </section>
         </div>
       </DialogContent>

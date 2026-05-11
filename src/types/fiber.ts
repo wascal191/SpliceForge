@@ -2,6 +2,41 @@ import type { Node, Edge } from "@xyflow/react";
 
 export type ElementType = "cable" | "splitter" | "equipment" | "closure";
 
+// ── Geographic types ────────────────────────────────────────────────────────
+
+/** WGS-84 coordinate pair. Note: stored as {lat,lng} but KMZ/GeoJSON use lng,lat order. */
+export type GeoPoint = { lat: number; lng: number };
+
+/** Ordered cable route waypoints from upstream to downstream end. */
+export type GeoPath = GeoPoint[];
+
+/** Optional geo block on every element — undefined means "not localized yet". */
+export type ElementGeo = {
+  lat?: number | null;
+  lng?: number | null;
+  path?: GeoPath | null;
+  address?: string | null;
+  updatedAt?: string | null;
+};
+
+/** Runtime-derived geographic feature — never persisted directly. */
+export type GeoFeature =
+  | {
+      kind: "point";
+      elementId: string;
+      nodeType: ElementType | "continuation";
+      lat: number;
+      lng: number;
+      label: string;
+    }
+  | {
+      kind: "line";
+      elementId: string;
+      nodeType: "cable";
+      path: GeoPath;
+      label: string;
+    };
+
 export type FiberPort = {
   id: string;
   elementId: string;
@@ -20,6 +55,7 @@ export type CableNodeData = {
   collapsedModules?: number[];
   collapsed?: boolean;
   ports: FiberPort[];
+  geo?: ElementGeo;
   [key: string]: unknown;
 };
 
@@ -30,6 +66,7 @@ export type SplitterNodeData = {
   outputCount: number;
   collapsed?: boolean;
   ports: FiberPort[];
+  geo?: ElementGeo;
   [key: string]: unknown;
 };
 
@@ -39,6 +76,7 @@ export type EquipmentNodeData = {
   outputCount: number;
   collapsed?: boolean;
   ports: FiberPort[];
+  geo?: ElementGeo;
   [key: string]: unknown;
 };
 
@@ -51,6 +89,7 @@ export type ClosureNodeData = {
   collapsedTrays?: number[];
   trayNotes?: Record<number, string>;
   ports: FiberPort[];
+  geo?: ElementGeo;
   [key: string]: unknown;
 };
 
@@ -59,6 +98,7 @@ export type ContinuationNodeData = {
   targetPageId: string;
   targetPageLabel: string;
   ports: FiberPort[];
+  geo?: ElementGeo;
   [key: string]: unknown;
 };
 

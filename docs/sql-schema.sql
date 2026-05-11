@@ -124,6 +124,28 @@ CREATE TABLE IF NOT EXISTS elements (
 
 CREATE INDEX IF NOT EXISTS idx_elements_page ON elements(page_id);
 
+-- ── Geospatial columns (additive — all nullable, zero impact on existing rows) ──
+ALTER TABLE elements
+  ADD COLUMN IF NOT EXISTS geo_lat        DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS geo_lng        DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS geo_path_json  JSONB,
+  ADD COLUMN IF NOT EXISTS geo_address    TEXT,
+  ADD COLUMN IF NOT EXISTS geo_updated_at TIMESTAMPTZ;
+
+-- Bedsheet-level default map view (center + zoom remembered per bedsheet).
+ALTER TABLE bedsheets
+  ADD COLUMN IF NOT EXISTS map_center_lat DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS map_center_lng DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS map_zoom       REAL;
+
+CREATE INDEX IF NOT EXISTS idx_elements_geo
+  ON elements (geo_lat, geo_lng)
+  WHERE geo_lat IS NOT NULL AND geo_lng IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_elements_page_geo
+  ON elements (page_id)
+  WHERE geo_lat IS NOT NULL OR geo_path_json IS NOT NULL;
+
 
 -- ============================================================
 -- SECTION 4: PORTS & SPLICES

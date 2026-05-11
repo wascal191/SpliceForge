@@ -43,7 +43,7 @@ export async function requireAuthContext(): Promise<AuthContext> {
     .limit(1)
     .maybeSingle();
   if (error) {
-    const e = error as Record<string, unknown>;
+    const e = error as unknown as Record<string, unknown>;
     // eslint-disable-next-line no-console
     console.error("[guards.requireAuthContext]", { message: e.message, code: e.code, details: e.details, hint: e.hint });
     throw new UnauthorizedError("Membership lookup failed");

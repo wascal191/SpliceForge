@@ -71,6 +71,12 @@ type RawElement = {
   position_x: number | null;
   position_y: number | null;
   config_json: Record<string, unknown> | null;
+  // Geo columns — present after migration, null on un-geotagged rows
+  geo_lat?: number | null;
+  geo_lng?: number | null;
+  geo_path_json?: unknown | null;
+  geo_address?: string | null;
+  geo_updated_at?: string | null;
 };
 
 type Page = { id: string; page_index: number; title: string | null };
@@ -106,11 +112,25 @@ function buildFiberPorts(rawPorts: RawPort[], inputCount: number, portsPerTray?:
   }));
 }
 
+function buildGeo(el: RawElement) {
+  if (el.geo_lat != null || el.geo_lng != null || el.geo_path_json != null) {
+    return {
+      lat: el.geo_lat ?? null,
+      lng: el.geo_lng ?? null,
+      path: (el.geo_path_json as { lat: number; lng: number }[] | null) ?? null,
+      address: el.geo_address ?? null,
+      updatedAt: el.geo_updated_at ?? null,
+    };
+  }
+  return undefined;
+}
+
 function buildNode(el: RawElement, rawPorts: RawPort[], pages: Page[]): Node {
   const cfg = el.config_json ?? {};
   const x = el.position_x ?? 100;
   const y = el.position_y ?? 100;
   const type = el.type as "cable" | "splitter" | "equipment" | "closure";
+  const geo = buildGeo(el);
 
   if (type === "equipment" && cfg.nodeType === "continuation") {
     const targetPage = pages.find((p) => p.id === cfg.targetPageId);
@@ -121,6 +141,7 @@ function buildNode(el: RawElement, rawPorts: RawPort[], pages: Page[]): Node {
         targetPageId: (cfg.targetPageId as string) ?? "",
         targetPageLabel: targetPage?.title ?? `Page ${(targetPage?.page_index ?? 0) + 1}`,
         ports: buildFiberPorts(rawPorts, 1),
+        ...(geo ? { geo } : {}),
       },
     };
   }
@@ -139,6 +160,7 @@ function buildNode(el: RawElement, rawPorts: RawPort[], pages: Page[]): Node {
         collapsedModules: (cfg.collapsedModules as number[] | undefined) ?? [],
         collapsed: (cfg.collapsed as boolean | undefined) ?? false,
         ports: buildFiberPorts(rawPorts, inputCount),
+        ...(geo ? { geo } : {}),
       },
     };
   }
@@ -147,19 +169,19 @@ function buildNode(el: RawElement, rawPorts: RawPort[], pages: Page[]): Node {
     const outputCount = (cfg.outputCount as number) ?? 8;
     return {
       id: el.id, type, position: { x, y },
-      data: { label: el.label ?? "Splitter", ratio: (cfg.ratio as string) ?? `${inputCount}:${outputCount}`, inputCount, outputCount, collapsed: (cfg.collapsed as boolean | undefined) ?? false, ports: buildFiberPorts(rawPorts, inputCount) },
+      data: { label: el.label ?? "Splitter", ratio: (cfg.ratio as string) ?? `${inputCount}:${outputCount}`, inputCount, outputCount, collapsed: (cfg.collapsed as boolean | undefined) ?? false, ports: buildFiberPorts(rawPorts, inputCount), ...(geo ? { geo } : {}) },
     };
   }
   if (type === "equipment") {
     const inputCount = (cfg.inputCount as number) ?? 2;
     const outputCount = (cfg.outputCount as number) ?? 2;
-    return { id: el.id, type, position: { x, y }, data: { label: el.label ?? "Equipment", inputCount, outputCount, collapsed: (cfg.collapsed as boolean | undefined) ?? false, ports: buildFiberPorts(rawPorts, inputCount) } };
+    return { id: el.id, type, position: { x, y }, data: { label: el.label ?? "Equipment", inputCount, outputCount, collapsed: (cfg.collapsed as boolean | undefined) ?? false, ports: buildFiberPorts(rawPorts, inputCount), ...(geo ? { geo } : {}) } };
   }
   const inputCount = (cfg.inputCount as number) ?? 6;
   const outputCount = (cfg.outputCount as number) ?? 6;
   const trayCount = (cfg.trayCount as number | undefined) ?? 1;
   const portsPerTray = inputCount + outputCount;
-  return { id: el.id, type, position: { x, y }, data: { label: el.label ?? "Closure", inputCount, outputCount, trayCount, collapsed: (cfg.collapsed as boolean | undefined) ?? false, collapsedTrays: (cfg.collapsedTrays as number[] | undefined) ?? [], trayNotes: (cfg.trayNotes as Record<number, string> | undefined) ?? {}, ports: buildFiberPorts(rawPorts, inputCount, portsPerTray) } };
+  return { id: el.id, type, position: { x, y }, data: { label: el.label ?? "Closure", inputCount, outputCount, trayCount, collapsed: (cfg.collapsed as boolean | undefined) ?? false, collapsedTrays: (cfg.collapsedTrays as number[] | undefined) ?? [], trayNotes: (cfg.trayNotes as Record<number, string> | undefined) ?? {}, ports: buildFiberPorts(rawPorts, inputCount, portsPerTray), ...(geo ? { geo } : {}) } };
 }
 
 type Props = { pageId: string; bedsheetId: string; pages: Page[]; onPageChange?: (pageId: string) => void };
@@ -226,6 +248,16 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
   const setPendingCableSplit = useCanvasStore((s) => s.setPendingCableSplit);
   const setCursorPos = useCanvasStore((s) => s.setCursorPos);
   const setPageNavigator = useCanvasStore((s) => s.setPageNavigator);
+  const setGeoView = useCanvasStore((s) => s.setView);
+  const setGeoLocalizingId = useCanvasStore((s) => s.setGeoLocalizingId);
+  const geoVersion = useCanvasStore((s) => s.geoVersion);
+  const storeSetNodes = useCanvasStore((s) => s.setNodes);
+
+  // Sync ReactFlow local nodes → store so MapView / LocalizePanel can read them
+  useEffect(() => {
+    storeSetNodes(nodes);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes]);
 
   // Register page navigation callback so ContinuationNode can trigger it
   useEffect(() => {
@@ -234,6 +266,7 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
   }, [onPageChange, setPageNavigator]);
 
   const [paneMenu, setPaneMenu] = useState<{ x: number; y: number } | null>(null);
+  const [nodeMenu, setNodeMenu] = useState<{ x: number; y: number; nodeId: string; hasGeo: boolean } | null>(null);
 
   const { fitView, getNodes, setViewport, screenToFlowPosition } = useReactFlow();
 
@@ -337,23 +370,23 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
     }
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageId]);
+  }, [pageId, geoVersion]);
 
   // Multi-trace: derive tracedEdgeIds/tracedNodeIds/colors from traceEntries
   useEffect(() => {
     if (traceEntries.size === 0) {
       setTracedIds(new Set(), new Set());
-      setTracedNodeColors(new Map());
+      setTracedNodeColors({});
       return;
     }
     const tracedEdgeIds = new Set(traceEntries.keys());
     const tracedNodeIds = new Set<string>();
-    const nodeColors = new Map<string, string>();
+    const nodeColors: Record<string, string> = {};
     for (const edge of edgesRef.current) {
       if (tracedEdgeIds.has(edge.id)) {
         const color = traceEntries.get(edge.id) ?? "#3b82f6";
-        if (edge.source) { tracedNodeIds.add(edge.source); if (!nodeColors.has(edge.source)) nodeColors.set(edge.source, color); }
-        if (edge.target) { tracedNodeIds.add(edge.target); if (!nodeColors.has(edge.target)) nodeColors.set(edge.target, color); }
+        if (edge.source) { tracedNodeIds.add(edge.source); if (!(edge.source in nodeColors)) nodeColors[edge.source] = color; }
+        if (edge.target) { tracedNodeIds.add(edge.target); if (!(edge.target in nodeColors)) nodeColors[edge.target] = color; }
       }
     }
     setTracedIds(tracedNodeIds, tracedEdgeIds);
@@ -995,6 +1028,29 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
                   <div className="border-t my-1" />
                 </>
               )}
+              {(() => {
+                const selectedNodes = getNodes().filter((n) => n.selected && n.type !== "continuation");
+                if (selectedNodes.length === 1) {
+                  const n = selectedNodes[0];
+                  const hasGeo = !!(n.data as { geo?: { lat?: unknown } }).geo?.lat;
+                  return (
+                    <>
+                      <button
+                        className="w-full text-left px-3 py-1.5 hover:bg-accent cursor-pointer outline-none font-medium text-emerald-600 dark:text-emerald-400"
+                        onClick={() => {
+                          setPaneMenu(null);
+                          setGeoLocalizingId(n.id);
+                          setGeoView("map");
+                        }}
+                      >
+                        {hasGeo ? "Edit location on map…" : "Set location on map…"}
+                      </button>
+                      <div className="border-t my-1" />
+                    </>
+                  );
+                }
+                return null;
+              })()}
               <button
                 className="w-full text-left px-3 py-1.5 hover:bg-accent cursor-pointer outline-none"
                 onClick={() => { setPaneMenu(null); collapseAll(); }}
@@ -1006,6 +1062,30 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
                 onClick={() => { setPaneMenu(null); expandAll(); }}
               >
                 Expand All
+              </button>
+            </div>
+          </>,
+          document.body
+        )
+      }
+      {nodeMenu && typeof document !== "undefined" &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-[9998]" onMouseDown={() => setNodeMenu(null)} onContextMenu={(e) => { e.preventDefault(); setNodeMenu(null); }} />
+            <div
+              className="fixed z-[9999] min-w-[180px] rounded-md border bg-popover text-popover-foreground shadow-md py-1 text-xs"
+              style={{ left: nodeMenu.x, top: nodeMenu.y }}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <button
+                className="w-full text-left px-3 py-1.5 hover:bg-accent cursor-pointer outline-none font-medium text-emerald-600 dark:text-emerald-400"
+                onClick={() => {
+                  setNodeMenu(null);
+                  setGeoLocalizingId(nodeMenu.nodeId);
+                  setGeoView("map");
+                }}
+              >
+                {nodeMenu.hasGeo ? "Edit location on map…" : "Set location on map…"}
               </button>
             </div>
           </>,
@@ -1068,8 +1148,16 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
           onNodeDragStop={onNodeDragStop}
           onNodesDelete={onNodesDelete}
           onEdgesDelete={onEdgesDelete}
-          onPaneClick={() => { clearTrace(); setPaneMenu(null); }}
-          onPaneContextMenu={(e) => { e.preventDefault(); setPaneMenu({ x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY }); }}
+          onPaneClick={() => { clearTrace(); setPaneMenu(null); setNodeMenu(null); }}
+          onPaneContextMenu={(e) => { e.preventDefault(); setNodeMenu(null); setPaneMenu({ x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY }); }}
+          onNodeContextMenu={(e, node) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setPaneMenu(null);
+            if (node.type === "continuation") return;
+            const hasGeo = !!(node.data as { geo?: { lat?: unknown } }).geo?.lat;
+            setNodeMenu({ x: e.clientX, y: e.clientY, nodeId: node.id, hasGeo });
+          }}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           connectionMode={ConnectionMode.Loose}

@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation";
 import FiberCanvas from "./FiberCanvas";
 import { PageSidebar } from "./PageSidebar";
 import { BedsheetGrid } from "./BedsheetGrid";
+import dynamic from "next/dynamic";
+
+const MapView = dynamic(
+  () => import("@/components/map/MapView").then((m) => m.MapView),
+  { ssr: false, loading: () => <div style={{ width: "100%", height: "100%", background: "#05070c" }} /> }
+);
 import { createPage } from "@/lib/actions/pages";
 import { useCanvasStore } from "@/store/canvasStore";
 import { createClient } from "@/lib/supabase/client";
@@ -239,6 +245,8 @@ export function CanvasLayout({ bedsheet, initialPages, userName, userEmail }: Pr
     initialPages[0]?.data_json?.header ?? {}
   );
   const [viewMode, setViewMode] = useState<"canvas" | "grid">("canvas");
+  const geoView = useCanvasStore((s) => s.view);
+  const setGeoView = useCanvasStore((s) => s.setView);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
   const darkMode = useCanvasStore((s) => s.darkMode);
@@ -367,7 +375,8 @@ export function CanvasLayout({ bedsheet, initialPages, userName, userEmail }: Pr
 
         {/* View switcher */}
         <div style={S.viewSwitch}>
-          <ViewBtn label="Canvas" active={viewMode === "canvas"} onClick={() => setViewMode("canvas")} darkMode={darkMode} />
+          <ViewBtn label="Canvas" active={viewMode === "canvas" && geoView === "schematic"} onClick={() => { setViewMode("canvas"); setGeoView("schematic"); }} darkMode={darkMode} />
+          <ViewBtn label="Map" active={viewMode === "canvas" && geoView === "map"} onClick={() => { setViewMode("canvas"); setGeoView("map"); }} darkMode={darkMode} />
           <ViewBtn label="Grid" active={viewMode === "grid"} onClick={() => setViewMode("grid")} darkMode={darkMode} />
         </div>
 
@@ -478,6 +487,8 @@ export function CanvasLayout({ bedsheet, initialPages, userName, userEmail }: Pr
               onPageSelect={handleGridPageSelect}
               onAddPage={handleGridAddPage}
             />
+          ) : geoView === "map" ? (
+            <MapView />
           ) : (
             <FiberCanvas
               pageId={currentPageId}

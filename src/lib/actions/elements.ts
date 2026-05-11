@@ -121,3 +121,33 @@ export async function getElements(pageId: string) {
   if (error) fail("elements.getElements", error, "Could not load elements");
   return data;
 }
+
+const UpdateGeoSchema = z.object({
+  elementId: Uuid,
+  lat: z.number().min(-90).max(90).nullable().optional(),
+  lng: z.number().min(-180).max(180).nullable().optional(),
+  path: z.array(z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })).nullable().optional(),
+  address: z.string().max(500).nullable().optional(),
+});
+
+export async function updateElementGeo(input: z.infer<typeof UpdateGeoSchema>) {
+  const parsed = parseOrFail(UpdateGeoSchema, input, "updateElementGeo");
+  const ctx = await requireAuthContext();
+  await assertOrgOwnsRow("elements", parsed.elementId, ctx.orgId);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("elements")
+    .update({
+      geo_lat: parsed.lat ?? null,
+      geo_lng: parsed.lng ?? null,
+      geo_path_json: parsed.path ?? null,
+      geo_address: parsed.address ?? null,
+      geo_updated_at: new Date().toISOString(),
+    })
+    .eq("id", parsed.elementId)
+    .select()
+    .single();
+  if (error) fail("elements.updateElementGeo", error, "Could not update element geometry");
+  return data;
+}

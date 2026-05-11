@@ -349,7 +349,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
   ];
 
   return (
-    <div style={{ display: "flex", flexShrink: 0, position: "relative", zIndex: 10 }}>
+    <div style={{ display: "flex", flexShrink: 0, position: "relative", zIndex: 10, height: "100%" }}>
 
       {/* ── Icon rail ── */}
       <div style={{

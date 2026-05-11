@@ -93,7 +93,7 @@ export async function getCurrentOrganization(): Promise<Organization | null> {
     .limit(1);
 
   if (error) {
-    const e = error as Record<string, unknown>;
+    const e = error as unknown as Record<string, unknown>;
     // eslint-disable-next-line no-console
     console.error("[organizations.getCurrentOrganization]", { message: e.message, code: e.code, details: e.details, hint: e.hint });
     return null;

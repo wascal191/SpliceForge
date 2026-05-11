@@ -10,6 +10,7 @@ import { PortHandle } from "./PortHandle";
 import { ContextMenu, type ContextMenuItem } from "@/components/ui/context-menu";
 import type { FiberPort } from "@/types/fiber";
 import type { EquipmentNodeData } from "@/types/fiber";
+import { useGeoMenuItem } from "@/hooks/useGeoMenuItem";
 
 function EquipmentNodeBase({
   id,
@@ -24,8 +25,9 @@ function EquipmentNodeBase({
 
   const tracedNodeIds = useCanvasStore((s) => s.tracedNodeIds);
   const isTraced = tracedNodeIds.has(id);
-  const traceColor = useCanvasStore((s) => s.tracedNodeColors.get(id) ?? "#3b82f6");
+  const traceColor = useCanvasStore((s) => s.tracedNodeColors[id] ?? "#3b82f6");
   const toggleTraceEntry = useCanvasStore((s) => s.toggleTraceEntry);
+  const geoMenuItem = useGeoMenuItem(id, !!(data.geo?.lat));
 
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelDraft, setLabelDraft] = useState(label);
@@ -96,6 +98,7 @@ function EquipmentNodeBase({
         }
       },
     },
+    geoMenuItem,
     {
       label: "Delete equipment",
       destructive: true,

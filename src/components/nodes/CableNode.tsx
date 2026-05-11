@@ -12,6 +12,7 @@ import { updatePortStatusBatch } from "@/lib/actions/ports";
 import { PortHandle } from "./PortHandle";
 import { ContextMenu, type ContextMenuItem } from "@/components/ui/context-menu";
 import type { CableNodeData } from "@/types/fiber";
+import { useGeoMenuItem } from "@/hooks/useGeoMenuItem";
 
 function CableNodeBase({
   id,
@@ -25,7 +26,7 @@ function CableNodeBase({
 
   const tracedNodeIds = useCanvasStore((s) => s.tracedNodeIds);
   const isTraced = tracedNodeIds.has(id);
-  const traceColor = useCanvasStore((s) => s.tracedNodeColors.get(id) ?? "#3b82f6");
+  const traceColor = useCanvasStore((s) => s.tracedNodeColors[id] ?? "#3b82f6");
   const setPendingCableSplit = useCanvasStore((s) => s.setPendingCableSplit);
 
   const [editingLabel, setEditingLabel] = useState(false);
@@ -36,6 +37,7 @@ function CableNodeBase({
   const [savedMsg, setSavedMsg] = useState(false);
   const toggleTraceEntry = useCanvasStore((s) => s.toggleTraceEntry);
   const traceEntries = useCanvasStore((s) => s.traceEntries);
+  const geoMenuItem = useGeoMenuItem(id, !!(data.geo?.lat));
   const { setNodes, setEdges, getEdges } = useReactFlow();
 
   const handlePortLabelChange = useCallback((portId: string, newLabel: string | null) => {
@@ -191,6 +193,7 @@ function CableNodeBase({
         setTimeout(() => setSavedMsg(false), 2000);
       },
     },
+    geoMenuItem,
     {
       label: "Delete cable",
       destructive: true,
