@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import type { MapRef } from "react-map-gl/maplibre";
 import { Marker } from "react-map-gl/maplibre";
 import { useCanvasStore } from "@/store/canvasStore";
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export const LocalizePanel = React.memo(function LocalizePanel({ mapRef: _mapRef }: Props) {
+  const t = useTranslations("canvas.map");
   const darkMode = useCanvasStore((s) => s.darkMode);
   const geoLocalizingId = useCanvasStore((s) => s.geoLocalizingId);
   const setGeoLocalizingId = useCanvasStore((s) => s.setGeoLocalizingId);
@@ -74,7 +76,7 @@ export const LocalizePanel = React.memo(function LocalizePanel({ mapRef: _mapRef
 
       if (isCable && polylineMode) {
         if (waypoints.length < 2) {
-          toast.error("A cable route needs at least 2 waypoints.");
+          toast.error(t("toasts.needWaypoints"));
           return;
         }
         await updateElementGeo({
@@ -92,7 +94,7 @@ export const LocalizePanel = React.memo(function LocalizePanel({ mapRef: _mapRef
         );
       } else {
         if (isNaN(parsedLat) || isNaN(parsedLng)) {
-          toast.error("Enter valid latitude and longitude.");
+          toast.error(t("toasts.invalidLatLng"));
           return;
         }
         await updateElementGeo({
@@ -112,10 +114,10 @@ export const LocalizePanel = React.memo(function LocalizePanel({ mapRef: _mapRef
 
       // Signal FiberCanvas to reload from DB next time the schematic is shown
       bumpGeoVersion();
-      toast.success("Location saved");
+      toast.success(t("toasts.locationSaved"));
       setGeoLocalizingId(null);
     } catch (err) {
-      toast.error("Save failed", { description: err instanceof Error ? err.message : "Could not save location." });
+      toast.error(t("toasts.saveFailed"), { description: err instanceof Error ? err.message : t("toasts.saveFailedDesc") });
     } finally {
       setSaving(false);
     }
@@ -132,10 +134,10 @@ export const LocalizePanel = React.memo(function LocalizePanel({ mapRef: _mapRef
         )
       );
       bumpGeoVersion();
-      toast.success("Location cleared");
+      toast.success(t("toasts.locationCleared"));
       setGeoLocalizingId(null);
     } catch (err) {
-      toast.error("Clear failed", { description: err instanceof Error ? err.message : String(err) });
+      toast.error(t("toasts.clearFailed"), { description: err instanceof Error ? err.message : String(err) });
     } finally {
       setSaving(false);
     }
@@ -200,7 +202,7 @@ export const LocalizePanel = React.memo(function LocalizePanel({ mapRef: _mapRef
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: text }}>Set Location</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: text }}>{t("setLocation")}</div>
             <div style={{ fontSize: 10, color: muted, marginTop: 1 }}>{label}</div>
           </div>
           <button
@@ -267,7 +269,7 @@ export const LocalizePanel = React.memo(function LocalizePanel({ mapRef: _mapRef
         )}
 
         <input
-          placeholder="Address / note (optional)"
+          placeholder={t("addressPlaceholder")}
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           style={{
@@ -307,8 +309,8 @@ export const LocalizePanel = React.memo(function LocalizePanel({ mapRef: _mapRef
 
         <div style={{ marginTop: 8, fontSize: 9, color: muted }}>
           {polylineMode
-            ? "Click the map to place route waypoints."
-            : "Click anywhere on the map to place a pin, or type coordinates."}
+            ? t("clickRoute")
+            : t("clickPin")}
         </div>
       </div>
     </>

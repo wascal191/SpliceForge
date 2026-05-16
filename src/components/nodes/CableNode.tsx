@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, memo, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Handle, Position, useReactFlow } from "@xyflow/react";
 import type { NodeProps, Node } from "@xyflow/react";
 import { getFiberHex, isLightColor, type FiberColorScheme } from "@/lib/fiber/colors";
@@ -19,6 +20,8 @@ function CableNodeBase({
   data,
   selected,
 }: NodeProps<Node<CableNodeData, "cable">>) {
+  const t = useTranslations("canvas.node");
+  const tCommon = useTranslations("common");
   const { label, fiberCount, ports } = data;
   const colorScheme = (data.colorScheme as FiberColorScheme | undefined) ?? "EIA598";
   const moduleFiberCount = (data.moduleFiberCount as number | undefined) ?? 0;
@@ -141,14 +144,14 @@ function CableNodeBase({
 
   const menuItems: ContextMenuItem[] = [
     {
-      label: "Rename",
+      label: tCommon("rename"),
       onSelect: () => {
         setLabelDraft(label);
         setEditingLabel(true);
       },
     },
     {
-      label: collapsed ? "Expand node" : "Collapse node",
+      label: collapsed ? t("expandNode") : t("collapseNode"),
       onSelect: async () => {
         const next = !collapsed;
         setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, collapsed: next } } : n));
@@ -163,7 +166,7 @@ function CableNodeBase({
       },
     },
     ...(moduleCount > 1 ? [{
-      label: allCollapsed ? "Expand all modules" : "Collapse all modules",
+      label: allCollapsed ? t("cable.expandAllModules") : t("cable.collapseAllModules"),
       onSelect: () => {
         const next = allCollapsed
           ? new Set<number>()
@@ -173,7 +176,7 @@ function CableNodeBase({
       },
     }] : []),
     {
-      label: "Trace all connections",
+      label: t("traceAll"),
       onSelect: () => {
         const edges = getEdges();
         for (const port of ports) {
@@ -186,7 +189,7 @@ function CableNodeBase({
       },
     },
     {
-      label: "Save to library",
+      label: t("cable.saveToLibrary"),
       onSelect: async () => {
         await saveToLibrary(label, fiberCount, colorScheme, moduleFiberCount || undefined);
         setSavedMsg(true);
@@ -195,7 +198,7 @@ function CableNodeBase({
     },
     geoMenuItem,
     {
-      label: "Delete cable",
+      label: t("deleteCable"),
       destructive: true,
       separatorBefore: true,
       onSelect: async () => {
@@ -219,7 +222,7 @@ function CableNodeBase({
               <button
                 className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center z-10 leading-none"
                 onClick={handleDelete}
-                title="Delete cable"
+                title={t("deleteCable")}
               >×</button>
             )}
             <div className="bg-muted px-2 py-1 flex items-center justify-between gap-2">
@@ -245,13 +248,13 @@ function CableNodeBase({
           <button
             className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center z-10 leading-none"
             onClick={handleDelete}
-            title="Delete cable"
+            title={t("deleteCable")}
           >×</button>
           <button
             className="absolute -top-2 left-1/2 -translate-x-1/2 text-[9px] bg-muted border rounded px-1 py-0 leading-4 z-10 whitespace-nowrap hover:bg-accent"
             onClick={(e) => { e.stopPropagation(); saveToLibrary(label, fiberCount, colorScheme, moduleFiberCount || undefined).then(() => { setSavedMsg(true); setTimeout(() => setSavedMsg(false), 2000); }); }}
-            title="Save to cable library"
-          >{savedMsg ? "✓ Saved" : "Save to Library"}</button>
+            title={t("cable.saveToLibraryTitle")}
+          >{savedMsg ? t("cable.saved") : t("cable.saveToLibraryShort")}</button>
         </>
       )}
 
@@ -275,7 +278,7 @@ function CableNodeBase({
         ) : (
           <span
             className="text-[11px] font-semibold truncate cursor-text flex-1 min-w-0"
-            title="Double-click to rename"
+            title={t("doubleClickRename")}
             onDoubleClick={(e) => {
               e.stopPropagation();
               setLabelDraft(label);
@@ -314,7 +317,7 @@ function CableNodeBase({
                   );
                 const moduleMenuItems: ContextMenuItem[] = [
                   {
-                    label: allModuleTraced ? "Untrace module" : "Trace module",
+                    label: allModuleTraced ? t("cable.untraceModule") : t("cable.traceModule"),
                     onSelect: () => {
                       const edges = getEdges();
                       for (const port of modulePorts) {
@@ -328,7 +331,7 @@ function CableNodeBase({
                     },
                   },
                   {
-                    label: "Clear all splices in this module",
+                    label: t("cable.clearModuleSplices"),
                     destructive: true,
                     onSelect: () => clearModuleSplices([
                       ...leftPorts.slice(start, end),

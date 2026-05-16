@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/guards";
 import { LibraryCableInput, Uuid, parseOrFail } from "@/lib/validation";
@@ -62,6 +63,7 @@ export async function saveToLibrary(
     .select()
     .single();
   if (error) fail("library.saveToLibrary", error, "Could not save to library");
+  revalidatePath("/canvas", "layout");
   return data;
 }
 
@@ -76,4 +78,5 @@ export async function deleteLibraryCable(id: string) {
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("library.deleteLibraryCable", error, "Could not delete library cable");
+  revalidatePath("/canvas", "layout");
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import {
   DndContext,
   closestCenter,
@@ -22,15 +23,16 @@ import { createPage, deletePage, renamePage, updatePageData, reorderPages, dupli
 import { useCanvasStore } from "@/store/canvasStore";
 import { toast } from "sonner";
 
-const PAGE_COLORS = [
-  { label: "None",   value: "" },
-  { label: "Red",    value: "#ef4444" },
-  { label: "Orange", value: "#f97316" },
-  { label: "Yellow", value: "#eab308" },
-  { label: "Green",  value: "#22c55e" },
-  { label: "Blue",   value: "#3b82f6" },
-  { label: "Purple", value: "#a855f7" },
-  { label: "Pink",   value: "#ec4899" },
+type PageColorKey = "none" | "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "pink";
+const PAGE_COLORS: { key: PageColorKey; value: string }[] = [
+  { key: "none",   value: "" },
+  { key: "red",    value: "#ef4444" },
+  { key: "orange", value: "#f97316" },
+  { key: "yellow", value: "#eab308" },
+  { key: "green",  value: "#22c55e" },
+  { key: "blue",   value: "#3b82f6" },
+  { key: "purple", value: "#a855f7" },
+  { key: "pink",   value: "#ec4899" },
 ];
 
 
@@ -98,6 +100,7 @@ function SortablePage({
   onSelect, onRenameChange, onRenameCommit, onRenameCancel,
   onDoubleClick, onDelete, onContextMenu, children,
 }: RowProps) {
+  const t = useTranslations("canvas.sidebar");
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: page.id });
 
@@ -137,7 +140,7 @@ function SortablePage({
         <span
           style={{ color: darkMode ? "#3B4A66" : "#CBD5E1", fontSize: 10, cursor: "grab", userSelect: "none", flexShrink: 0 }}
           {...attributes} {...listeners}
-          title="Drag to reorder"
+          title={t("dragToReorder")}
         >⣿</span>
 
         {/* Color dot */}
@@ -188,7 +191,7 @@ function SortablePage({
             }}
             className="group-hover:flex"
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            title="Delete page"
+            title={t("deletePage")}
           >×</button>
         )}
       </div>
@@ -200,6 +203,7 @@ function SortablePage({
 
 /* ─── Main Sidebar ─── */
 export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, onPagesChange, onHeaderChange }: Props) {
+  const t = useTranslations("canvas.sidebar");
   const darkMode      = useCanvasStore((s) => s.darkMode);
   const toggleDarkMode= useCanvasStore((s) => s.toggleDarkMode);
   const bwMode        = useCanvasStore((s) => s.bwMode);
@@ -218,8 +222,32 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
 
   const activePage = pages.find((p) => p.id === currentPageId);
 
+  // Keep latest values in refs so the debounced save closure isn't stale
+  // when currentPageId changes between keystroke and timer fire. Mutating
+  // refs is done inside effects (not in render) to satisfy React 19's
+  // react-hooks/refs rule.
+  const activePageRef = useRef(activePage);
+  const headerDraftRef = useRef(headerDraft);
+  useEffect(() => { activePageRef.current = activePage; }, [activePage]);
+  useEffect(() => { headerDraftRef.current = headerDraft; }, [headerDraft]);
+
+  // On page change: flush any pending header save against the OLD page, then
+  // reset the draft from the new page. Without flushing, the timer would fire
+  // after the switch and write the old draft to the wrong page.
   useEffect(() => {
     setHeaderDraft(activePage?.data_json?.header ?? {});
+    return () => {
+      if (headerSaveTimer.current) {
+        clearTimeout(headerSaveTimer.current);
+        headerSaveTimer.current = null;
+        const pendingPage = activePageRef.current;
+        const pendingDraft = headerDraftRef.current;
+        if (pendingPage) {
+          const newData = { ...(pendingPage.data_json ?? {}), header: pendingDraft };
+          updatePageData(pendingPage.id, newData).catch(() => { /* best-effort */ });
+        }
+      }
+    };
   }, [currentPageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -254,7 +282,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
       onPagesChange(updated);
       onPageChange(newPage.id);
     } catch (err) {
-      toast.error("Failed to create page", { description: err instanceof Error ? err.message : undefined });
+      toast.error(t("toasts.createFailed"), { description: err instanceof Error ? err.message : undefined });
     }
   }
 
@@ -266,7 +294,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
       onPagesChange(updated);
       if (currentPageId === pageId) onPageChange(updated[0].id);
     } catch (err) {
-      toast.error("Failed to delete page", { description: err instanceof Error ? err.message : undefined });
+      toast.error(t("toasts.deleteFailed"), { description: err instanceof Error ? err.message : undefined });
     }
   }
 
@@ -279,7 +307,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
       onPagesChange(updated);
       onPageChange(newPage.id);
     } catch (err) {
-      toast.error("Failed to duplicate page", { description: err instanceof Error ? err.message : undefined });
+      toast.error(t("toasts.duplicateFailed"), { description: err instanceof Error ? err.message : undefined });
     } finally {
       setDuplicating(null);
     }
@@ -293,7 +321,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
       await renamePage(pageId, trimmed);
       onPagesChange(pages.map((p) => (p.id === pageId ? { ...p, title: trimmed } : p)));
     } catch (err) {
-      toast.error("Failed to rename page", { description: err instanceof Error ? err.message : undefined });
+      toast.error(t("toasts.renameFailed"), { description: err instanceof Error ? err.message : undefined });
     }
   }
 
@@ -306,7 +334,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
       await updatePageData(pageId, newData);
       onPagesChange(pages.map((p) => (p.id === pageId ? { ...p, data_json: newData } : p)));
     } catch (err) {
-      toast.error("Failed to set page color", { description: err instanceof Error ? err.message : undefined });
+      toast.error(t("toasts.colorFailed"), { description: err instanceof Error ? err.message : undefined });
     }
   }
 
@@ -322,7 +350,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
         await updatePageData(activePage.id, newData);
         onPagesChange(pages.map((p) => (p.id === activePage.id ? { ...p, data_json: newData } : p)));
       } catch (err) {
-        toast.error("Failed to save header", { description: err instanceof Error ? err.message : undefined });
+        toast.error(t("toasts.headerFailed"), { description: err instanceof Error ? err.message : undefined });
       }
     }, 800);
   }
@@ -337,15 +365,15 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
   const fg        = darkMode ? "#F1F5F9" : "#0F172A";
 
   const railItems: { k: OpenPanel; icon: string | React.ReactNode; tip: string; color: string }[] = [
-    { k: "pages",    icon: ICONS.layers,   tip: "Pages",    color: "#00E5FF" },
-    { k: "history",  icon: ICONS.history,  tip: "History",  color: "#94A3B8" },
-    { k: "settings", icon: ICONS.settings, tip: "Settings", color: "#94A3B8" },
+    { k: "pages",    icon: ICONS.layers,   tip: t("pages"),    color: "#00E5FF" },
+    { k: "history",  icon: ICONS.history,  tip: t("history"),  color: "#94A3B8" },
+    { k: "settings", icon: ICONS.settings, tip: t("settings"), color: "#94A3B8" },
   ];
 
   const settingRows: { label: string; desc: string; active: boolean; toggle: () => void; shortcut?: string }[] = [
-    { label: "B&W Mode",     desc: "Grayscale fiber colors",   active: bwMode,      toggle: toggleBwMode,   shortcut: "Ctrl+B" },
-    { label: "Snap to Grid", desc: "Align nodes to 10px grid", active: snapGrid,    toggle: toggleSnapGrid },
-    { label: darkMode ? "Light Mode" : "Dark Mode", desc: darkMode ? "Switch to white theme" : "Switch to dark theme", active: darkMode, toggle: toggleDarkMode },
+    { label: t("bwMode"),     desc: t("bwModeDesc"),   active: bwMode,      toggle: toggleBwMode,   shortcut: "Ctrl+B" },
+    { label: t("snapGrid"), desc: t("snapGridDesc"), active: snapGrid,    toggle: toggleSnapGrid },
+    { label: darkMode ? t("lightMode") : t("darkMode"), desc: darkMode ? t("darkToWhite") : t("darkToDark"), active: darkMode, toggle: toggleDarkMode },
   ];
 
   return (
@@ -362,7 +390,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
         {/* Collapse/expand toggle */}
         <button
           onClick={() => setOpenPanel(openPanel ? null : "pages")}
-          title={openPanel ? "Close panel" : "Open pages"}
+          title={openPanel ? t("closePanel") : t("openPages")}
           style={{
             width: 36, height: 36, border: "none", borderRadius: 8,
             background: "transparent", color: dim,
@@ -422,19 +450,19 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
           {openPanel === "pages" && (
             <>
               <div style={{ padding: "12px 14px 10px", borderBottom: `1px solid ${sep}` }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: fg, letterSpacing: "-0.01em", marginBottom: 4 }}>Pages</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: fg, letterSpacing: "-0.01em", marginBottom: 4 }}>{t("pages")}</div>
                 <div style={{ fontFamily: "var(--font-geist-mono, monospace)", fontSize: 9.5, color: dim }}>
-                  {pages.length} page{pages.length !== 1 ? "s" : ""}
+                  {t("pageCount", { count: pages.length })}
                 </div>
               </div>
 
               <div style={{ padding: "7px 14px", borderBottom: `1px solid ${sep}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ fontFamily: "var(--font-geist-mono, monospace)", fontSize: 9, letterSpacing: "0.16em", color: "#00E5FF" }}>
-                  PAGES · {pages.length}
+                  {t("pagesUppercase")} · {pages.length}
                 </div>
                 <button
                   onClick={handleAddPage}
-                  title="Add page"
+                  title={t("addPage")}
                   style={{ background: "transparent", border: "none", color: "#00E5FF", cursor: "pointer", padding: 3, display: "flex" }}
                 >
                   <Icon d={ICONS.plus} size={12} />
@@ -471,7 +499,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
                                   borderBottom: `1px solid ${darkMode ? "rgba(148,184,255,0.15)" : "rgba(15,23,42,0.12)"}`,
                                   outline: "none", color: darkMode ? "#CBD5E1" : "#475569", padding: "2px 0",
                                 }}
-                                placeholder={field === "nodeName" ? "Node name…" : field === "address" ? "Address…" : "Description…"}
+                                placeholder={field === "nodeName" ? t("nodeNamePlaceholder") : field === "address" ? t("addressPlaceholder") : t("descriptionPlaceholder")}
                                 value={headerDraft[field] ?? ""}
                                 onChange={(e) => handleHeaderChange(field, e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
@@ -494,7 +522,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
                     display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5,
                   }}
                 >
-                  <Icon d={ICONS.plus} size={11} /> Add Page
+                  <Icon d={ICONS.plus} size={11} /> {t("addPageBtn")}
                 </button>
               </div>
 
@@ -504,7 +532,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
           {/* ── History panel ── */}
           {openPanel === "history" && (
             <div style={{ padding: 14, display: "flex", flexDirection: "column" }}>
-              <div style={{ fontFamily: "var(--font-geist-mono, monospace)", fontSize: 9, letterSpacing: "0.18em", color: dim, marginBottom: 12 }}>HISTORY</div>
+              <div style={{ fontFamily: "var(--font-geist-mono, monospace)", fontSize: 9, letterSpacing: "0.18em", color: dim, marginBottom: 12 }}>{t("historyUppercase")}</div>
               {[
                 { label: "Page renamed",  time: "just now", color: "#00E5FF" },
                 { label: "Node moved",    time: "1m ago",   color: "#94A3B8" },
@@ -526,7 +554,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
           {/* ── Settings panel ── */}
           {openPanel === "settings" && (
             <div style={{ padding: 14, display: "flex", flexDirection: "column" }}>
-              <div style={{ fontFamily: "var(--font-geist-mono, monospace)", fontSize: 9, letterSpacing: "0.18em", color: dim, marginBottom: 12 }}>CANVAS SETTINGS</div>
+              <div style={{ fontFamily: "var(--font-geist-mono, monospace)", fontSize: 9, letterSpacing: "0.18em", color: dim, marginBottom: 12 }}>{t("canvasSettings")}</div>
 
               {settingRows.map((item) => (
                 <button
@@ -587,7 +615,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
             onClick={() => handleDuplicate(contextMenu.pageId)}
             disabled={duplicating === contextMenu.pageId}
           >
-            {duplicating === contextMenu.pageId ? "Duplicating…" : "⧉  Duplicate page"}
+            {duplicating === contextMenu.pageId ? t("duplicating") : `⧉  ${t("duplicatePage")}`}
           </button>
 
           <button
@@ -600,7 +628,7 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
               setRenameValue(page.title ?? `Page ${page.page_index + 1}`);
             }}
           >
-            ✏️  Rename
+            ✏️  {t("rename")}
           </button>
 
           {pages.length > 1 && (
@@ -608,17 +636,17 @@ export function PageSidebar({ bedsheetId, pages, currentPageId, onPageChange, on
               style={{ width: "100%", textAlign: "left", padding: "10px 14px", fontSize: 12, color: "#ef4444", background: "transparent", border: "none", borderBottom: `1px solid ${sep}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
               onClick={() => { handleDeletePage(contextMenu.pageId); setContextMenu(null); }}
             >
-              🗑️  Delete page
+              🗑️  {t("deletePage")}
             </button>
           )}
 
           <div style={{ padding: "10px 14px" }}>
-            <div style={{ fontSize: 10, color: dim, marginBottom: 6 }}>Page color</div>
+            <div style={{ fontSize: 10, color: dim, marginBottom: 6 }}>{t("pageColor")}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
               {PAGE_COLORS.map((c) => (
                 <button
                   key={c.value}
-                  title={c.label}
+                  title={t(`color.${c.key}`)}
                   style={{
                     width: 18, height: 18, borderRadius: 999, cursor: "pointer",
                     border: `2px solid ${(pages.find((p) => p.id === contextMenu.pageId)?.data_json?.color ?? "") === c.value ? (darkMode ? "#00E5FF" : "#0284C7") : "transparent"}`,

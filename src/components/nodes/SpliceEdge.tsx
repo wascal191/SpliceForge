@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, memo } from "react";
+import { useTranslations } from "next-intl";
 import {
   getBezierPath,
   EdgeLabelRenderer,
@@ -47,6 +48,7 @@ function SpliceEdgeBase({
   const edgeTraceColor = traceEntries.get(id) ?? "#3b82f6";
   const { setEdges, setNodes, getNodes, getViewport } = useReactFlow();
 
+  const t = useTranslations("canvas.node");
   const comment = (data?.comment as string) ?? "";
   const justCreated = Boolean(data?.justCreated);
   const labelOffsetX = (data?.labelOffsetX as number) ?? 0;
@@ -109,14 +111,14 @@ function SpliceEdgeBase({
 
   const menuItems: ContextMenuItem[] = [
     {
-      label: "Edit note",
+      label: t("edge.editNote"),
       onSelect: () => {
         setDraft(comment);
         setEditing(true);
       },
     },
     {
-      label: isTraced ? "Remove from trace" : "Trace this connection",
+      label: isTraced ? t("edge.removeFromTrace") : t("edge.traceConnection"),
       onSelect: () => {
         const srcNode = sourceHandleId ? getNodes().find((n) => {
           const ports = (n.data as { ports?: FiberPort[] }).ports;
@@ -131,12 +133,12 @@ function SpliceEdgeBase({
       },
     },
     {
-      label: comment ? `Copy note ("${comment.slice(0, 18)}${comment.length > 18 ? "…" : ""}")` : "Copy note",
+      label: comment ? t("edge.copyNoteWith", { text: `${comment.slice(0, 18)}${comment.length > 18 ? "…" : ""}` }) : t("edge.copyNote"),
       disabled: !comment,
       onSelect: () => setCommentClipboard(comment),
     },
     {
-      label: commentClipboard ? `Paste note ("${commentClipboard.slice(0, 18)}${commentClipboard.length > 18 ? "…" : ""}")` : "Paste note",
+      label: commentClipboard ? t("edge.pasteNoteWith", { text: `${commentClipboard.slice(0, 18)}${commentClipboard.length > 18 ? "…" : ""}` }) : t("edge.pasteNote"),
       disabled: !commentClipboard,
       onSelect: async () => {
         if (commentClipboard == null) return;
@@ -149,7 +151,7 @@ function SpliceEdgeBase({
       },
     },
     {
-      label: "Delete splice",
+      label: t("deleteSplice"),
       destructive: true,
       separatorBefore: true,
       onSelect: performDelete,
@@ -288,7 +290,7 @@ function SpliceEdgeBase({
                   className="text-[11px] bg-background border border-primary rounded px-1.5 py-0.5 w-36 shadow-md outline-none"
                   value={draft}
                   autoFocus
-                  placeholder="Add a note…"
+                  placeholder={t("edge.addNotePlaceholder")}
                   onChange={(e) => setDraft(e.target.value)}
                   onBlur={commitEdit}
                   onKeyDown={(e) => {

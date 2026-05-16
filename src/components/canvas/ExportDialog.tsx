@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { useReactFlow, getNodesBounds, getViewportForBounds } from "@xyflow/react";
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
@@ -68,6 +69,7 @@ function download(url: string, filename: string) {
 type Scope = "traced" | "all";
 
 export function ExportDialog() {
+  const t = useTranslations("canvas.export");
   const exportOpen = useCanvasStore((s) => s.exportOpen);
   const setExportOpen = useCanvasStore((s) => s.setExportOpen);
   const darkMode = useCanvasStore((s) => s.darkMode);
@@ -319,7 +321,7 @@ export function ExportDialog() {
     <Dialog open={exportOpen} onOpenChange={setExportOpen}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Export / Print</DialogTitle>
+          <DialogTitle>{t("title")}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-3 pt-1">
@@ -331,18 +333,18 @@ export function ExportDialog() {
               checked={bw}
               onChange={(e) => setBw(e.target.checked)}
             />
-            Black &amp; White output
+            {t("bwOutput")}
           </label>
 
           {/* ── TRACED PATH (primary, shown only when trace is active) ── */}
           {hasTrace && (
             <section className="flex flex-col gap-2 rounded-lg border-2 border-primary/40 bg-primary/5 p-3">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wide text-primary">Traced Path HD</span>
-                <span className="text-[10px] text-muted-foreground">{tracedNodeCount} node{tracedNodeCount !== 1 ? "s" : ""}</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-primary">{t("tracedPathHd")}</span>
+                <span className="text-[10px] text-muted-foreground">{t("nodeCount", { count: tracedNodeCount })}</span>
               </div>
               <p className="text-[11px] text-muted-foreground leading-snug">
-                Exports only the highlighted trace — zoomed and cropped to fill the page.
+                {t("tracedHint")}
               </p>
               <div className="flex gap-2">
                 <Button size="sm" className="flex-1" disabled={isBusy} onClick={() => exportPDF("traced")}>
@@ -363,7 +365,7 @@ export function ExportDialog() {
           {/* ── FULL CANVAS ── */}
           <section className="flex flex-col gap-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              {hasTrace ? "Full Canvas" : "Export Canvas"}
+              {hasTrace ? t("fullCanvas") : t("exportCanvas")}
             </p>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" className="flex-1" disabled={isBusy} onClick={() => exportPDF("all")}>
@@ -382,21 +384,21 @@ export function ExportDialog() {
 
           {/* ── SPREADSHEET ── */}
           <section className="flex flex-col gap-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Spreadsheet (XLSX)</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("spreadsheet")}</p>
             {hasTrace && (
               <div className="flex gap-3 text-xs">
                 <label className="flex items-center gap-1.5 cursor-pointer">
                   <input type="radio" name="xlsxScope" checked={xlsxScope === "all"} onChange={() => setXlsxScope("all")} />
-                  All connections
+                  {t("allConnections")}
                 </label>
                 <label className="flex items-center gap-1.5 cursor-pointer">
                   <input type="radio" name="xlsxScope" checked={xlsxScope === "traced"} onChange={() => setXlsxScope("traced")} />
-                  Traced only
+                  {t("tracedOnly")}
                 </label>
               </div>
             )}
             <Button size="sm" variant="outline" disabled={isBusy} onClick={exportXLSX}>
-              {busy === "xlsx" ? "…" : "Export XLSX"}
+              {busy === "xlsx" ? "…" : t("exportXlsx")}
             </Button>
           </section>
 
@@ -405,22 +407,22 @@ export function ExportDialog() {
           {/* ── GIS EXPORT ── */}
           <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">GIS / Map Export</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("gisExport")}</p>
               {totalCount > 0 && (
                 <span className="text-[10px] text-muted-foreground">
-                  {geoCount}/{totalCount} located
+                  {t("located", { geo: geoCount, total: totalCount })}
                 </span>
               )}
             </div>
             {geoCount === 0 ? (
               <p className="text-[11px] text-muted-foreground leading-snug">
-                No elements have geographic locations yet. Use "Set location on map…" from the canvas context menu.
+                {t("noGeo")}
               </p>
             ) : (
               <>
                 {hasTrace && (
                   <section className="flex flex-col gap-2 rounded-lg border-2 border-primary/40 bg-primary/5 p-3">
-                    <p className="text-xs font-bold uppercase tracking-wide text-primary">Traced Path</p>
+                    <p className="text-xs font-bold uppercase tracking-wide text-primary">{t("tracedPath")}</p>
                     <div className="flex gap-2">
                       <Button size="sm" className="flex-1" disabled={isBusy} onClick={() => exportKmz("traced")}>
                         {busy === "kmz-traced" ? "…" : "KMZ"}
@@ -433,10 +435,10 @@ export function ExportDialog() {
                 )}
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" className="flex-1" disabled={isBusy} onClick={() => exportKmz("all")}>
-                    {busy === "kmz-all" ? "…" : "KMZ (All)"}
+                    {busy === "kmz-all" ? "…" : t("kmzAll")}
                   </Button>
                   <Button size="sm" variant="outline" className="flex-1" disabled={isBusy} onClick={() => exportGeoJson("all")}>
-                    {busy === "geojson-all" ? "…" : "GeoJSON (All)"}
+                    {busy === "geojson-all" ? "…" : t("geojsonAll")}
                   </Button>
                 </div>
               </>

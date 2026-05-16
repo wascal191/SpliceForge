@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { createPortal } from "react-dom";
 import {
   ReactFlow,
@@ -30,7 +31,7 @@ import { Toolbar } from "./Toolbar";
 import { SearchPanel } from "./SearchPanel";
 import { StatusBar } from "./StatusBar";
 import { ExportDialog } from "./ExportDialog";
-import { ImportDialog } from "./ImportDialog";
+import { ImportWizard } from "./ImportWizard";
 import { BulkSpliceRangeDialog } from "./BulkSpliceRangeDialog";
 
 import {
@@ -187,6 +188,7 @@ function buildNode(el: RawElement, rawPorts: RawPort[], pages: Page[]): Node {
 type Props = { pageId: string; bedsheetId: string; pages: Page[]; onPageChange?: (pageId: string) => void };
 
 function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
+  const t = useTranslations("canvas.canvasToasts");
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
@@ -363,8 +365,8 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
           else fitView({ duration: 400 });
         }, 50);
       } catch (err) {
-        toast.error("Failed to load page", {
-          description: err instanceof Error ? err.message : "Could not fetch data from the server.",
+        toast.error(t("loadPageFailed"), {
+          description: err instanceof Error ? err.message : t("loadPageFailedDesc"),
         });
       }
     }
@@ -496,8 +498,8 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
         }
       }
     } catch (err) {
-      toast.error("Paste failed", {
-        description: err instanceof Error ? err.message : "Could not save pasted elements.",
+      toast.error(t("pasteFailed"), {
+        description: err instanceof Error ? err.message : t("pasteFailedDesc"),
       });
     }
     if (newNodes.length > 0) {
@@ -557,8 +559,8 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
         })),
       ]);
     } catch (err) {
-      toast.error("Bulk splice failed", {
-        description: err instanceof Error ? err.message : "Could not create splices.",
+      toast.error(t("bulkSpliceFailed"), {
+        description: err instanceof Error ? err.message : t("createSplicesFailedDesc"),
       });
     }
   }
@@ -604,8 +606,8 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
       clearBulkPorts();
       setBulkPortSelectMode(false);
     } catch (err) {
-      toast.error("Bulk connect failed", {
-        description: err instanceof Error ? err.message : "Could not create splices.",
+      toast.error(t("bulkConnectFailed"), {
+        description: err instanceof Error ? err.message : t("createSplicesFailedDesc"),
       });
     }
   }
@@ -635,8 +637,8 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
         }),
       ]);
     } catch (err) {
-      toast.error("Range splice failed", {
-        description: err instanceof Error ? err.message : "Could not create splices.",
+      toast.error(t("rangeSpliceFailed"), {
+        description: err instanceof Error ? err.message : t("createSplicesFailedDesc"),
       });
     }
   }
@@ -735,8 +737,8 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
       setNodes((nds) => [...nds, newNode]);
       setEdges((eds) => [...eds, splitEdge]);
     } catch (err) {
-      toast.error("Cable split failed", {
-        description: err instanceof Error ? err.message : "Could not split the cable.",
+      toast.error(t("cableSplitFailed"), {
+        description: err instanceof Error ? err.message : t("cableSplitFailedDesc"),
       });
     }
   }
@@ -784,8 +786,8 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
       }]);
       setPendingContinuationPortId(null);
     } catch (err) {
-      toast.error("Continuation failed", {
-        description: err instanceof Error ? err.message : "Could not create the continuation node.",
+      toast.error(t("continuationFailed"), {
+        description: err instanceof Error ? err.message : t("continuationFailedDesc"),
       });
     }
   }
@@ -823,8 +825,8 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
       }));
       setEdges((eds) => addEdge({ id: splice.id, type: "splice", reconnectable: true, source: connection.source, target: connection.target, sourceHandle, targetHandle, data: { comment: splice.comment ?? "", justCreated: true } }, eds));
     } catch (err) {
-      toast.error("Splice failed", {
-        description: err instanceof Error ? err.message : "Could not save the connection.",
+      toast.error(t("spliceFailed"), {
+        description: err instanceof Error ? err.message : t("spliceFailedDesc"),
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -834,8 +836,8 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
     try {
       await Promise.all(deleted.map((n) => deleteElement(n.id)));
     } catch (err) {
-      toast.error("Delete failed", {
-        description: err instanceof Error ? err.message : "Could not delete element(s) from the database.",
+      toast.error(t("deleteFailed"), {
+        description: err instanceof Error ? err.message : t("deleteFailedDesc"),
       });
     }
   }, []);
@@ -869,8 +871,8 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
         );
       }
     } catch (err) {
-      toast.error("Delete splice failed", {
-        description: err instanceof Error ? err.message : "Could not remove connection(s) from the database.",
+      toast.error(t("deleteSpliceFailed"), {
+        description: err instanceof Error ? err.message : t("deleteSpliceFailedDesc"),
       });
     }
   }, [setNodes]);
@@ -920,8 +922,8 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
           : e
       ));
     } catch (err) {
-      toast.error("Reconnect failed", {
-        description: err instanceof Error ? err.message : "Could not move the splice connection.",
+      toast.error(t("reconnectFailed"), {
+        description: err instanceof Error ? err.message : t("reconnectFailedDesc"),
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -937,8 +939,8 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
     try {
       await Promise.all(nodes.map((n) => updateElement(n.id, { position_x: n.position.x, position_y: n.position.y })));
     } catch (err) {
-      toast.error("Position not saved", {
-        description: err instanceof Error ? err.message : "Could not persist node position.",
+      toast.error(t("positionNotSaved"), {
+        description: err instanceof Error ? err.message : t("positionNotSavedDesc"),
       });
     }
   }, []);
@@ -962,7 +964,7 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
         onRangeSplice={handleOpenRangeSplice}
       />
       <ExportDialog />
-      <ImportDialog pageId={pageId} setNodes={setNodes} setEdges={setEdges} />
+      <ImportWizard pageId={pageId} />
       <BulkSpliceRangeDialog
         open={bulkSpliceRangeOpen}
         nodeA={bulkSpliceRangeNodeIds ? getNodes().find((n) => n.id === bulkSpliceRangeNodeIds[0]) ?? null : null}

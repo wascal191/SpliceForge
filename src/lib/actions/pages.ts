@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext, assertOrgOwnsRow, assertOrgOwnsRows } from "@/lib/guards";
 import {
@@ -31,6 +32,7 @@ export async function createPage(bedsheetId: string, pageIndex: number, title?: 
     .select()
     .single();
   if (error) fail("pages.createPage", error, "Could not create page");
+  revalidatePath("/canvas", "layout");
   return data;
 }
 
@@ -61,6 +63,7 @@ export async function renamePage(pageId: string, title: string) {
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("pages.renamePage", error, "Could not rename page");
+  revalidatePath("/canvas", "layout");
 }
 
 export async function deletePage(pageId: string) {
@@ -74,6 +77,7 @@ export async function deletePage(pageId: string) {
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("pages.deletePage", error, "Could not delete page");
+  revalidatePath("/canvas", "layout");
 }
 
 export async function updatePageData(pageId: string, dataJson: unknown) {
@@ -88,6 +92,7 @@ export async function updatePageData(pageId: string, dataJson: unknown) {
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("pages.updatePageData", error, "Could not save page");
+  revalidatePath("/canvas", "layout");
 }
 
 const ReorderSchema = z.array(
@@ -110,6 +115,7 @@ export async function reorderPages(updates: unknown) {
         .eq("organization_id", ctx.orgId)
     )
   );
+  revalidatePath("/canvas", "layout");
 }
 
 export async function duplicatePage(sourcePageId: string, bedsheetId: string) {
@@ -260,5 +266,6 @@ export async function duplicatePage(sourcePageId: string, bedsheetId: string) {
     }
   }
 
+  revalidatePath("/canvas", "layout");
   return newPage;
 }

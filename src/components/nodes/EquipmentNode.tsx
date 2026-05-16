@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, memo } from "react";
+import { useTranslations } from "next-intl";
 import { useReactFlow } from "@xyflow/react";
 import type { NodeProps, Node } from "@xyflow/react";
 import { getFiberHex, type FiberColorScheme } from "@/lib/fiber/colors";
@@ -17,6 +18,8 @@ function EquipmentNodeBase({
   data,
   selected,
 }: NodeProps<Node<EquipmentNodeData, "equipment">>) {
+  const t = useTranslations("canvas.node");
+  const tCommon = useTranslations("common");
   const { label, inputCount, outputCount, ports } = data;
   const collapsed = (data.collapsed as boolean | undefined) ?? false;
   const inputPorts = ports.filter((p) => p.side === "left");
@@ -77,11 +80,11 @@ function EquipmentNodeBase({
 
   const menuItems: ContextMenuItem[] = [
     {
-      label: "Rename",
+      label: tCommon("rename"),
       onSelect: () => { setLabelDraft(label); setEditingLabel(true); },
     },
     {
-      label: collapsed ? "Expand node" : "Collapse node",
+      label: collapsed ? t("expandNode") : t("collapseNode"),
       onSelect: async () => {
         const next = !collapsed;
         setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, collapsed: next } } : n));
@@ -89,7 +92,7 @@ function EquipmentNodeBase({
       },
     },
     {
-      label: "Trace all connections",
+      label: t("traceAll"),
       onSelect: () => {
         const edges = getEdges();
         for (const port of ports) {
@@ -100,7 +103,7 @@ function EquipmentNodeBase({
     },
     geoMenuItem,
     {
-      label: "Delete equipment",
+      label: t("deleteEquipment"),
       destructive: true,
       separatorBefore: true,
       onSelect: async () => {
@@ -124,7 +127,7 @@ function EquipmentNodeBase({
               <button
                 className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center z-10 leading-none"
                 onClick={handleDelete}
-                title="Delete equipment"
+                title={t("deleteEquipment")}
               >×</button>
             )}
             <div className="bg-muted px-2 py-1 flex items-center justify-between gap-2">
@@ -149,7 +152,7 @@ function EquipmentNodeBase({
         <button
           className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center z-10 leading-none"
           onClick={handleDelete}
-          title="Delete equipment"
+          title={t("deleteEquipment")}
         >×</button>
       )}
       <div className="border-b bg-muted px-2 py-1 flex items-center gap-1.5" style={{ minWidth: 0 }}>
@@ -172,7 +175,7 @@ function EquipmentNodeBase({
         ) : (
           <span
             className="text-[11px] font-semibold truncate cursor-text flex-1 min-w-0"
-            title="Double-click to rename"
+            title={t("doubleClickRename")}
             onDoubleClick={(e) => {
               e.stopPropagation();
               setLabelDraft(label);

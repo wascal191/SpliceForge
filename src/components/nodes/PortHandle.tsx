@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, memo } from "react";
+import { useTranslations } from "next-intl";
 import { Handle, Position, useReactFlow } from "@xyflow/react";
 import { useCanvasStore } from "@/store/canvasStore";
 import { ContextMenu, type ContextMenuItem } from "@/components/ui/context-menu";
@@ -27,6 +28,7 @@ function PortHandleBase({
   portLabel,
   onLabelChange,
 }: Props) {
+  const t = useTranslations("canvas.node.port");
   const traceEntries = useCanvasStore((s) => s.traceEntries);
   const toggleTraceEntry = useCanvasStore((s) => s.toggleTraceEntry);
   const removeTraceColor = useCanvasStore((s) => s.removeTraceColor);
@@ -155,7 +157,7 @@ function PortHandleBase({
 
   const items: ContextMenuItem[] = [
     {
-      label: "Trace from here",
+      label: t("traceFromHere"),
       disabled: !hasSplice || traced,
       onSelect: () => {
         if (!spliceEdge || traced) return;
@@ -163,7 +165,7 @@ function PortHandleBase({
       },
     },
     {
-      label: "Clear splice",
+      label: t("clearSplice"),
       disabled: !hasSplice,
       destructive: true,
       onSelect: async () => {
@@ -199,12 +201,12 @@ function PortHandleBase({
       separatorBefore: true,
     },
     {
-      label: currentComment ? `Copy note ("${currentComment.slice(0, 18)}${currentComment.length > 18 ? "…" : ""}")` : "Copy note",
+      label: currentComment ? t("copyNoteWith", { text: `${currentComment.slice(0, 18)}${currentComment.length > 18 ? "…" : ""}` }) : t("copyNote"),
       disabled: !hasSplice || !currentComment,
       onSelect: () => setCommentClipboard(currentComment),
     },
     {
-      label: commentClipboard ? `Paste note ("${commentClipboard.slice(0, 18)}${commentClipboard.length > 18 ? "…" : ""}")` : "Paste note",
+      label: commentClipboard ? t("pasteNoteWith", { text: `${commentClipboard.slice(0, 18)}${commentClipboard.length > 18 ? "…" : ""}` }) : t("pasteNote"),
       disabled: !hasSplice || !commentClipboard,
       onSelect: async () => {
         const edge = findSpliceEdge();
@@ -221,26 +223,19 @@ function PortHandleBase({
     },
   ];
 
-  // only include copy/paste when splice exists
-  const visibleItems = items.filter((it) => {
-    if (it.label.startsWith("Clear splice") || it.label.startsWith("Copy note") || it.label.startsWith("Paste note")) {
-      if (!hasSplice) return false;
-    }
-    return true;
-  });
-
-  // fall back: if no splice, expose just trace toggle to keep menu short
-  const finalItems = hasSplice ? visibleItems : [items[0]];
+  // Clear/Copy/Paste only make sense when a splice exists; with no splice
+  // we expose just the trace toggle to keep the menu short.
+  const finalItems = hasSplice ? items : [items[0]];
 
   // Port label menu item
   finalItems.push({
-    label: portLabel ? `Edit label: "${portLabel.slice(0, 18)}${portLabel.length > 18 ? "…" : ""}"` : "Set label…",
+    label: portLabel ? t("editLabel", { text: `${portLabel.slice(0, 18)}${portLabel.length > 18 ? "…" : ""}` }) : t("setLabel"),
     separatorBefore: true,
     onSelect: () => { setLabelDraft(portLabel ?? ""); setEditingLabel(true); },
   });
 
   finalItems.push({
-    label: "Continue to page…",
+    label: t("continueToPage"),
     disabled: portStatus === "occupied",
     onSelect: () => setPendingContinuationPortId(portId),
   });
@@ -298,7 +293,7 @@ function PortHandleBase({
               <input
                 autoFocus
                 className="text-[10px] border rounded px-1.5 py-0.5 bg-background outline-none focus:ring-1 focus:ring-primary w-full shadow-md"
-                placeholder="Port label…"
+                placeholder={t("portLabelPlaceholder")}
                 value={labelDraft}
                 onChange={(e) => setLabelDraft(e.target.value)}
                 onBlur={commitLabel}

@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -10,13 +11,13 @@ import {
 } from "@/lib/guards";
 import {
   Email,
-  HumanName,
   InvitableRole,
   OrgName,
   Uuid,
   parseOrFail,
 } from "@/lib/validation";
 import { fail } from "@/lib/errors";
+import { env, MAX_MEMBERS_PER_ORG } from "@/env";
 
 export type Organization = {
   id: string;
@@ -45,31 +46,24 @@ export async function createOrganization(name: string): Promise<Organization> {
   } = await supabase.auth.getUser();
   if (authError || !user) throw new UnauthorizedError("Not authenticated");
 
-  // Admin client is required here: a brand-new user has no membership row yet,
-  // so RLS-policies that reference organization_members would block the insert.
   const admin = createAdminClient();
 
-  // Block user from spawning multiple orgs through this entry point.
-  const { data: existing } = await admin
-    .from("organization_members")
-    .select("id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (existing) throw new ForbiddenError("Already a member of an organization");
+  // Atomic: org insert + owner-member insert run inside the RPC. If either
+  // fails, neither row persists. See docs/migrations/2026-05-12-org-rpc.sql.
+  const { data: org, error } = await admin.rpc("create_org_with_owner", {
+    p_name: cleanName,
+    p_user_id: user.id,
+  });
 
-  const { data: org, error } = await admin
-    .from("organizations")
-    .insert({ name: cleanName })
-    .select()
-    .single();
-  if (error || !org) fail("organizations.createOrganization.org", error, "Could not create organization");
+  if (error) {
+    const msg = (error.message ?? "").toLowerCase();
+    if (msg.includes("already_member")) {
+      throw new ForbiddenError("Already a member of an organization");
+    }
+    fail("organizations.createOrganization", error, "Could not create organization");
+  }
 
-  const { error: memberError } = await admin
-    .from("organization_members")
-    .insert({ organization_id: org!.id, user_id: user.id, role: "owner" });
-  if (memberError) fail("organizations.createOrganization.member", memberError, "Could not create organization");
-
+  revalidatePath("/dashboard");
   return org as Organization;
 }
 
@@ -118,26 +112,39 @@ export async function getOrgMembers(): Promise<OrgMember[]> {
     .eq("organization_id", ctx.orgId)
     .order("created_at", { ascending: true });
   if (error) fail("organizations.getOrgMembers", error, "Could not list members");
-  if (!data) return [];
+  if (!data || data.length === 0) return [];
 
-  const members = await Promise.all(
-    data.map(async (m) => {
-      try {
-        const {
-          data: { user },
-        } = await admin.auth.admin.getUserById(m.user_id);
-        return {
-          ...m,
-          email: user?.email ?? null,
-          full_name:
-            (user?.user_metadata?.full_name as string | undefined) ?? null,
-        };
-      } catch {
-        return { ...m, email: null, full_name: null };
-      }
-    })
-  );
-  return members;
+  // Single auth lookup instead of N getUserById() round-trips. The org cap
+  // makes 1000 a safe upper bound today; if multi-org listing is added later,
+  // paginate this call.
+  const { data: usersRes, error: usersErr } =
+    await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (usersErr) {
+    fail(
+      "organizations.getOrgMembers.listUsers",
+      usersErr,
+      "Could not list members"
+    );
+  }
+
+  const byId = new Map<string, { email: string | null; full_name: string | null }>();
+  for (const u of usersRes?.users ?? []) {
+    const meta = (u.user_metadata ?? {}) as { full_name?: unknown };
+    byId.set(u.id, {
+      email: u.email ?? null,
+      full_name:
+        typeof meta.full_name === "string" ? meta.full_name : null,
+    });
+  }
+
+  return data.map((m) => {
+    const u = byId.get(m.user_id);
+    return {
+      ...m,
+      email: u?.email ?? null,
+      full_name: u?.full_name ?? null,
+    };
+  });
 }
 
 export async function getCurrentUserRole(): Promise<string | null> {
@@ -161,24 +168,25 @@ export async function inviteMember(
 
   const admin = createAdminClient();
 
-  // Enforce 5-user cap (server-side, can't be bypassed by UI tampering).
+  // Enforce the org member cap server-side (UI tampering cannot bypass).
   const { count } = await admin
     .from("organization_members")
     .select("*", { count: "exact", head: true })
     .eq("organization_id", ctx.orgId);
 
-  if ((count ?? 0) >= 5) {
-    throw new Error("Maximum 5 users per company in test mode");
+  if ((count ?? 0) >= MAX_MEMBERS_PER_ORG) {
+    throw new Error(
+      `Maximum ${MAX_MEMBERS_PER_ORG} users per organization on this plan`
+    );
   }
 
   // CRITICAL: do NOT pass `data` (=> user_metadata, attacker-controllable
   // post-confirmation). Org/role attachment is performed via server-side
   // app_metadata which only the service role can write.
+  const siteUrl = env.NEXT_PUBLIC_SITE_URL ?? "";
   const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(
     cleanEmail,
-    {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/auth/callback`,
-    }
+    { redirectTo: `${siteUrl}/auth/callback` }
   );
   if (error) fail("organizations.inviteMember.invite", error, "Could not send invite");
 
@@ -194,6 +202,8 @@ export async function inviteMember(
     );
     if (updErr) fail("organizations.inviteMember.appMeta", updErr, "Could not send invite");
   }
+
+  revalidatePath("/dashboard");
 }
 
 export async function updateMemberRole(
@@ -205,7 +215,7 @@ export async function updateMemberRole(
   // promoting between editor and viewer.
   const cleanRole = parseOrFail(InvitableRole, role, "updateMemberRole.role");
 
-  const { ctx, targetOrgId } = await assertCallerIsOwnerOfMember(cleanId);
+  const { targetOrgId } = await assertCallerIsOwnerOfMember(cleanId);
 
   const admin = createAdminClient();
   const { error } = await admin
@@ -215,15 +225,13 @@ export async function updateMemberRole(
     .eq("organization_id", targetOrgId); // defense in depth
   if (error) fail("organizations.updateMemberRole", error, "Could not update role");
 
-  // No-op assertion to use ctx and silence unused-warning.
-  void ctx;
+  revalidatePath("/dashboard");
 }
 
 export async function removeMember(memberId: string): Promise<void> {
   const cleanId = parseOrFail(Uuid, memberId, "removeMember.id");
   const { ctx, targetOrgId } = await assertCallerIsOwnerOfMember(cleanId);
 
-  // Don't let the only remaining owner be deleted.
   const admin = createAdminClient();
   const { data: target } = await admin
     .from("organization_members")
@@ -242,7 +250,6 @@ export async function removeMember(memberId: string): Promise<void> {
     }
   }
 
-  // Don't let owners delete themselves accidentally through this UI path.
   if (target?.user_id === ctx.userId) {
     throw new ForbiddenError("Cannot remove yourself; transfer ownership first");
   }
@@ -266,6 +273,5 @@ export async function removeMember(memberId: string): Promise<void> {
     }
   }
 
-  // Use HumanName to avoid linter complaint about unused export
-  void HumanName;
+  revalidatePath("/dashboard");
 }

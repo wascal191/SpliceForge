@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/guards";
 import {
@@ -26,6 +27,7 @@ export async function createProject(name: string, description?: string) {
     .select()
     .single();
   if (error) fail("projects.createProject", error, "Could not create project");
+  revalidatePath("/dashboard");
   return data;
 }
 
@@ -58,6 +60,7 @@ export async function deleteProject(id: string) {
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("projects.deleteProject", error, "Could not delete project");
+  revalidatePath("/dashboard");
 }
 
 export async function updateProject(id: string, updates: unknown) {
@@ -72,6 +75,7 @@ export async function updateProject(id: string, updates: unknown) {
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("projects.updateProject", error, "Could not update project");
+  revalidatePath("/dashboard");
 }
 
 export async function getProjectStats() {

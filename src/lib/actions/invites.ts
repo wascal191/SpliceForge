@@ -2,6 +2,7 @@
 
 import crypto from "crypto";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/lib/guards";
 import { fail } from "@/lib/errors";
 import { rateLimitOrThrow } from "@/lib/ratelimit";
+import { MAX_MEMBERS_PER_ORG } from "@/env";
 
 // Public-facing invite metadata returned to the UI; never includes the
 // hashed token or any DB internals.
@@ -25,7 +27,6 @@ export type OrgInvite = {
 
 const TOKEN_BYTES = 32;
 const INVITE_TTL_DAYS = 7;
-const MAX_USES = 5;
 
 function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -59,13 +60,14 @@ export async function createInviteToken(): Promise<OrgInvite> {
       token_hash: tokenHash,
       created_by: ctx.userId,
       expires_at: expiresAt,
-      max_uses: MAX_USES,
+      max_uses: MAX_MEMBERS_PER_ORG,
       uses: 0,
     })
     .select("id, organization_id, created_by, created_at, expires_at")
     .single();
   if (error || !data) fail("invites.createInviteToken", error, "Could not create invite");
 
+  revalidatePath("/dashboard");
   // Token is returned exactly once to the caller (the owner who just made it).
   return { ...(data as Omit<OrgInvite, "token">), token };
 }
@@ -103,6 +105,7 @@ export async function revokeInviteToken(): Promise<void> {
 
   const admin = createAdminClient();
   await admin.from("organization_invites").delete().eq("organization_id", ctx.orgId);
+  revalidatePath("/dashboard");
 }
 
 /**
@@ -122,7 +125,7 @@ export async function validateInviteToken(
       h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       h.get("x-real-ip") ||
       "anon";
-    rateLimitOrThrow(`invite-validate:${ip}`, 30, 60_000);
+    await rateLimitOrThrow(`invite-validate:${ip}`, 30, 60_000);
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("Too many")) return null;
   }
@@ -140,10 +143,16 @@ export async function validateInviteToken(
   if (data.expires_at && new Date(data.expires_at as string).getTime() < Date.now()) return null;
   if (typeof data.uses === "number" && typeof data.max_uses === "number" && data.uses >= data.max_uses) return null;
 
-  const org = data.organizations as unknown as { id: string; name: string };
+  const org = data.organizations as unknown as { id: string; name: string } | null;
+  if (!org || !org.id || !org.name) return null;
   return { orgId: org.id, orgName: org.name };
 }
 
+/**
+ * Atomic invite consumption. The cap-check, member insert, and use-count
+ * increment all run inside a SECURITY DEFINER RPC that locks the invite row,
+ * so two concurrent joiners can't both squeeze past the cap.
+ */
 export async function joinOrganizationByToken(token: string): Promise<void> {
   const supabase = await createClient();
   const {
@@ -151,51 +160,31 @@ export async function joinOrganizationByToken(token: string): Promise<void> {
   } = await supabase.auth.getUser();
   if (!user) throw new UnauthorizedError("Not authenticated");
 
-  const result = await validateInviteToken(token);
-  if (!result) throw new Error("Invalid or expired invite link");
+  if (typeof token !== "string" || !/^[a-f0-9]{64}$/i.test(token)) {
+    throw new Error("Invalid or expired invite link");
+  }
 
   const admin = createAdminClient();
+  const { error } = await admin.rpc("consume_invite_token", {
+    p_token_hash: hashToken(token),
+    p_user_id: user.id,
+  });
 
-  // Enforce the org's 5-user cap on the join path too (V-07).
-  const { count } = await admin
-    .from("organization_members")
-    .select("*", { count: "exact", head: true })
-    .eq("organization_id", result.orgId);
-  if ((count ?? 0) >= 5) throw new Error("This organization is full");
-
-  // Already a member?
-  const { data: existing } = await admin
-    .from("organization_members")
-    .select("id")
-    .eq("organization_id", result.orgId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!existing) {
-    const { error } = await admin
-      .from("organization_members")
-      .insert({ organization_id: result.orgId, user_id: user.id, role: "editor" });
-    if (error) fail("invites.joinOrganizationByToken.insert", error, "Could not join organization");
-  }
-
-  // Atomically increment uses; expire the token if the cap is reached.
-  const tokenHash = hashToken(token);
-  const { data: row } = await admin
-    .from("organization_invites")
-    .select("uses, max_uses")
-    .eq("token_hash", tokenHash)
-    .maybeSingle();
-  if (row) {
-    const newUses = (row.uses as number ?? 0) + 1;
-    const cap = row.max_uses as number ?? MAX_USES;
-    if (newUses >= cap) {
-      // Burn the token: revoke entirely so it can never be reused.
-      await admin.from("organization_invites").delete().eq("token_hash", tokenHash);
-    } else {
-      await admin
-        .from("organization_invites")
-        .update({ uses: newUses })
-        .eq("token_hash", tokenHash);
+  if (error) {
+    const msg = (error.message ?? "").toLowerCase();
+    if (msg.includes("token_not_found") || msg.includes("token_expired") || msg.includes("token_exhausted")) {
+      throw new Error("Invalid or expired invite link");
     }
+    if (msg.includes("cap_exceeded")) {
+      throw new Error("This organization is full");
+    }
+    if (msg.includes("already_member")) {
+      // Treat as success for idempotency — user is already where they want.
+      revalidatePath("/dashboard");
+      return;
+    }
+    fail("invites.joinOrganizationByToken", error, "Could not join organization");
   }
+
+  revalidatePath("/dashboard");
 }

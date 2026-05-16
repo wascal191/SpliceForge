@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
 import type { MapRef, MapMouseEvent } from "react-map-gl/maplibre";
 import { useCanvasStore } from "@/store/canvasStore";
@@ -26,6 +27,7 @@ const Map = dynamic(
 const ALL_TYPES = new Set(["cable", "closure", "splitter", "equipment", "continuation"]);
 
 function EmptyGeoState({ darkMode }: { darkMode: boolean }) {
+  const t = useTranslations("canvas.map");
   const setGeoLocalizingId = useCanvasStore((s) => s.setGeoLocalizingId);
   const nodes = useCanvasStore((s) => s.nodes);
 
@@ -47,10 +49,10 @@ function EmptyGeoState({ darkMode }: { darkMode: boolean }) {
       </svg>
       <div style={{ textAlign: "center" }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: darkMode ? "#f1f5f9" : "#0f172a", marginBottom: 4 }}>
-          No locations yet
+          {t("noLocationsTitle")}
         </div>
         <div style={{ fontSize: 12, maxWidth: 260 }}>
-          Right-click any element on the schematic and choose "Set location on map", or click below to start.
+          {t("noLocationsHint")}
         </div>
       </div>
       {firstUngeotagged && (
@@ -62,7 +64,7 @@ function EmptyGeoState({ darkMode }: { darkMode: boolean }) {
             color: "#041018", fontWeight: 700, fontSize: 12, cursor: "pointer",
           }}
         >
-          Localize first element
+          {t("localizeFirst")}
         </button>
       )}
     </div>

@@ -51,6 +51,18 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 # Full public URL of your deployment (no trailing slash)
 # Used as the redirect base in organization invite emails
 NEXT_PUBLIC_SITE_URL=https://your-domain.com
+
+# ── Rate limiting (recommended in production) ────────────────
+# When both are set, the invite-validation rate limiter switches from a
+# per-instance in-memory bucket to a shared Upstash Redis store, so the
+# limit holds across serverless instances.
+# Get them from: https://console.upstash.com → REST API
+UPSTASH_REDIS_REST_URL=https://...upstash.io
+UPSTASH_REDIS_REST_TOKEN=...
+
+# ── Tier configuration ───────────────────────────────────────
+# Optional. Defaults to 5. Number of users allowed per organization.
+MAX_MEMBERS_PER_ORG=5
 ```
 
 ### Variable Reference
@@ -61,6 +73,11 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.com
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Public | Anon key for browser + SSR |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | **Server only** | Admin operations (org tables, invite emails) |
 | `NEXT_PUBLIC_SITE_URL` | Yes | Public | Base URL for invite email callback links |
+| `UPSTASH_REDIS_REST_URL` | Recommended | **Server only** | Distributed rate limiter backend |
+| `UPSTASH_REDIS_REST_TOKEN` | Recommended | **Server only** | Distributed rate limiter backend |
+| `MAX_MEMBERS_PER_ORG` | Optional | **Server only** | Org size cap (default 5) |
+
+> Env vars are validated at boot by `src/env.ts` (Zod schema). A missing required var fails fast at startup with a clear "Missing env var X" message instead of a cryptic runtime crash on the first request.
 
 > **Security:** The `SUPABASE_SERVICE_ROLE_KEY` bypasses all Row-Level Security policies. It must never be included in client-side bundles. In the codebase it is only imported inside `src/lib/supabase/admin.ts`, which is called exclusively from Server Actions (files with `"use server"` directive).
 
@@ -79,6 +96,15 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.com
 Open the **SQL Editor** in the Supabase dashboard and run the full contents of `docs/sql-schema.sql`.
 
 This creates all tables, indexes, foreign-key constraints, RLS policies, and the `splice_summary` view in the correct order.
+
+### 3.2.1 Apply RPC Migrations
+
+After running the base schema, apply the RPC migrations in `docs/migrations/`, in date order:
+
+1. `docs/migrations/2026-05-12-org-rpc.sql` — adds `create_org_with_owner(name, user_id)` for atomic org + owner provisioning.
+2. `docs/migrations/2026-05-12-invite-rpc.sql` — adds `consume_invite_token(token_hash, user_id)` for atomic invite consumption with a row-level lock.
+
+Both files use `CREATE OR REPLACE FUNCTION` and revoke privileges from `anon`/`authenticated`, so they are safe to re-apply.
 
 > **Tip:** You can also use the Supabase CLI:
 > ```bash

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, memo } from "react";
+import { useTranslations } from "next-intl";
 import { useReactFlow } from "@xyflow/react";
 import type { NodeProps, Node } from "@xyflow/react";
 import { useCanvasStore } from "@/store/canvasStore";
@@ -13,6 +14,7 @@ function ContinuationNodeBase({
   data,
   selected,
 }: NodeProps<Node<ContinuationNodeData, "continuation">>) {
+  const t = useTranslations("canvas.node");
   const { label, targetPageLabel, ports } = data;
   const inputPorts = ports.filter((p) => p.side === "left");
   const outputPorts = ports.filter((p) => p.side === "right");
@@ -66,7 +68,7 @@ function ContinuationNodeBase({
         <button
           className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center z-10 leading-none"
           onClick={handleDelete}
-          title="Delete"
+          title={t("delete")}
         >
           ×
         </button>
@@ -92,7 +94,7 @@ function ContinuationNodeBase({
           <span
             className="text-[11px] font-semibold truncate cursor-text"
             style={{ color: "#8b5cf6" }}
-            title="Double-click to rename"
+            title={t("doubleClickRename")}
             onDoubleClick={(e) => {
               e.stopPropagation();
               setLabelDraft(label);
@@ -107,7 +109,7 @@ function ContinuationNodeBase({
       <div
         className="text-[10px] text-center px-2 py-0.5 cursor-pointer hover:underline"
         style={{ color: "#8b5cf6" }}
-        title={`Go to ${targetPageLabel}`}
+        title={t("continuation.goTo", { page: targetPageLabel })}
         onClick={(e) => { e.stopPropagation(); pageNavigator?.(data.targetPageId); }}
       >
         → {targetPageLabel}

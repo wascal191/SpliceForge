@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext, assertOrgOwnsRows } from "@/lib/guards";
 import { ColorString, SpliceUpdate, Uuid, parseOrFail } from "@/lib/validation";
@@ -33,6 +34,7 @@ export async function createSplice(
     .select()
     .single();
   if (error) fail("splices.createSplice", error, "Could not create splice");
+  revalidatePath("/canvas", "layout");
   return data;
 }
 
@@ -47,6 +49,7 @@ export async function deleteSplice(id: string) {
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("splices.deleteSplice", error, "Could not delete splice");
+  revalidatePath("/canvas", "layout");
 }
 
 export async function deleteSplicesBatch(ids: string[]) {
@@ -61,6 +64,7 @@ export async function deleteSplicesBatch(ids: string[]) {
     .in("id", cleanIds)
     .eq("organization_id", ctx.orgId);
   if (error) fail("splices.deleteSplicesBatch", error, "Could not delete splices");
+  revalidatePath("/canvas", "layout");
 }
 
 export async function updateSplice(id: string, updates: unknown) {
@@ -75,6 +79,7 @@ export async function updateSplice(id: string, updates: unknown) {
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("splices.updateSplice", error, "Could not update splice");
+  revalidatePath("/canvas", "layout");
 }
 
 const PairsSchema = z
@@ -101,6 +106,7 @@ export async function createSplicesBatch(pairs: unknown) {
     )
     .select();
   if (error) fail("splices.createSplicesBatch", error, "Could not create splices");
+  revalidatePath("/canvas", "layout");
   return data;
 }
 

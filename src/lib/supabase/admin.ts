@@ -1,23 +1,20 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { env, serverEnv } from "@/env";
 
-// Requires SUPABASE_SERVICE_ROLE_KEY in .env.local (never expose to browser).
 // Cached as a module-level singleton to avoid re-instantiation on every call.
+// The service role key bypasses RLS and is therefore reserved for trusted
+// server-side flows — never expose it to a browser bundle.
 let cached: SupabaseClient | null = null;
 
 export function createAdminClient(): SupabaseClient {
   if (cached) return cached;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceKey) {
-    throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars"
-    );
-  }
-
-  cached = createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  cached = createClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    serverEnv().SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+    }
+  );
   return cached;
 }

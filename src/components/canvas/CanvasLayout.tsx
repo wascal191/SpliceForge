@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import FiberCanvas from "./FiberCanvas";
 import { PageSidebar } from "./PageSidebar";
 import { BedsheetGrid } from "./BedsheetGrid";
@@ -16,6 +16,8 @@ import { createPage } from "@/lib/actions/pages";
 import { useCanvasStore } from "@/store/canvasStore";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { CanvasTour } from "@/components/onboarding/CanvasTour";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
 type PageHeader = { nodeName?: string; address?: string; description?: string };
 
@@ -138,6 +140,7 @@ function AppBarBtn({ children, onClick, variant = "ghost", darkMode }: {
 function UserMenu({
   userName, userEmail, darkMode,
 }: { userName?: string | null; userEmail?: string | null; darkMode: boolean }) {
+  const t = useTranslations("dashboard.team");
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -214,6 +217,8 @@ function UserMenu({
             </div>
           </div>
 
+          <LocaleSwitcher />
+
           {/* Actions */}
           <div style={{ padding: "6px 0" }}>
             <button
@@ -229,7 +234,7 @@ function UserMenu({
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
-              Sign out
+              {t("signOut")}
             </button>
           </div>
         </div>
@@ -239,6 +244,7 @@ function UserMenu({
 }
 
 export function CanvasLayout({ bedsheet, initialPages, userName, userEmail }: Props) {
+  const t = useTranslations("canvas.header");
   const [pages, setPages] = useState<Page[]>(initialPages);
   const [currentPageId, setCurrentPageId] = useState(initialPages[0].id);
   const [activeHeader, setActiveHeader] = useState<PageHeader>(
@@ -375,22 +381,22 @@ export function CanvasLayout({ bedsheet, initialPages, userName, userEmail }: Pr
 
         {/* View switcher */}
         <div style={S.viewSwitch}>
-          <ViewBtn label="Canvas" active={viewMode === "canvas" && geoView === "schematic"} onClick={() => { setViewMode("canvas"); setGeoView("schematic"); }} darkMode={darkMode} />
-          <ViewBtn label="Map" active={viewMode === "canvas" && geoView === "map"} onClick={() => { setViewMode("canvas"); setGeoView("map"); }} darkMode={darkMode} />
-          <ViewBtn label="Grid" active={viewMode === "grid"} onClick={() => setViewMode("grid")} darkMode={darkMode} />
+          <ViewBtn label={t("viewCanvas")} active={viewMode === "canvas" && geoView === "schematic"} onClick={() => { setViewMode("canvas"); setGeoView("schematic"); }} darkMode={darkMode} />
+          <ViewBtn label={t("viewMap")} active={viewMode === "canvas" && geoView === "map"} onClick={() => { setViewMode("canvas"); setGeoView("map"); }} darkMode={darkMode} />
+          <ViewBtn label={t("viewGrid")} active={viewMode === "grid"} onClick={() => setViewMode("grid")} darkMode={darkMode} />
         </div>
 
         {/* Sync indicator */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font-geist-mono, monospace)", fontSize: 10, color: darkMode ? "#64748B" : "#94A3B8", letterSpacing: "0.04em", flexShrink: 0 }}>
           <SyncDot />
-          <span>{pages.length} page{pages.length !== 1 ? "s" : ""}</span>
+          <span>{t("pagesCount", { count: pages.length })}</span>
         </div>
 
         <div style={S.divider} />
 
-        <AppBarBtn darkMode={darkMode} onClick={handleShare}>Share</AppBarBtn>
-        <AppBarBtn darkMode={darkMode} onClick={() => setImportOpen(true)}>Import</AppBarBtn>
-        <AppBarBtn variant="primary" darkMode={darkMode} onClick={() => setExportOpen(true)}>Export</AppBarBtn>
+        <AppBarBtn darkMode={darkMode} onClick={handleShare}>{t("share")}</AppBarBtn>
+        <AppBarBtn darkMode={darkMode} onClick={() => setImportOpen(true)}>{t("import")}</AppBarBtn>
+        <span data-tour="export"><AppBarBtn variant="primary" darkMode={darkMode} onClick={() => setExportOpen(true)}>{t("export")}</AppBarBtn></span>
 
         <UserMenu userName={userName} userEmail={userEmail} darkMode={darkMode} />
       </header>
@@ -415,7 +421,7 @@ export function CanvasLayout({ bedsheet, initialPages, userName, userEmail }: Pr
             }}
           >
             <p style={{ fontWeight: 700, fontSize: 14, color: darkMode ? "#F1F5F9" : "#0F172A", marginBottom: 12 }}>
-              Share view-only link
+              {t("shareTitle")}
             </p>
             <input
               readOnly
@@ -429,7 +435,7 @@ export function CanvasLayout({ bedsheet, initialPages, userName, userEmail }: Pr
               }}
             />
             <p style={{ fontSize: 11, color: darkMode ? "#64748B" : "#94A3B8", marginTop: 8 }}>
-              Anyone with this link can view this page in read-only mode.
+              {t("shareHint")}
             </p>
             <button
               onClick={() => setShareOpen(false)}
@@ -438,7 +444,7 @@ export function CanvasLayout({ bedsheet, initialPages, userName, userEmail }: Pr
                 background: darkMode ? "rgba(148,184,255,0.1)" : "rgba(15,23,42,0.06)",
                 color: darkMode ? "#CBD5E1" : "#475569", cursor: "pointer", fontFamily: "inherit", fontSize: 12,
               }}
-            >Close</button>
+            >{t("close")}</button>
           </div>
         </div>
       )}
@@ -499,6 +505,7 @@ export function CanvasLayout({ bedsheet, initialPages, userName, userEmail }: Pr
           )}
         </div>
       </div>
+      <CanvasTour />
     </div>
   );
 }

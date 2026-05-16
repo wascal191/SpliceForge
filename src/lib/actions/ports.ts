@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext, assertOrgOwnsRow, assertOrgOwnsRows } from "@/lib/guards";
 import { PortLabel, PortStatus, Uuid, parseOrFail } from "@/lib/validation";
@@ -34,6 +35,7 @@ export async function createPorts(
     .select()
     .order("port_index", { ascending: true });
   if (error) fail("ports.createPorts", error, "Could not create ports");
+  revalidatePath("/canvas", "layout");
   return data;
 }
 
@@ -91,6 +93,7 @@ export async function updatePortStatusBatch(
     .in("id", cleanIds)
     .eq("organization_id", ctx.orgId);
   if (error) fail("ports.updatePortStatusBatch", error, "Could not update ports");
+  revalidatePath("/canvas", "layout");
 }
 
 export async function updatePortStatus(
@@ -108,6 +111,7 @@ export async function updatePortStatus(
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("ports.updatePortStatus", error, "Could not update port");
+  revalidatePath("/canvas", "layout");
 }
 
 export async function updatePortLabel(
@@ -125,4 +129,5 @@ export async function updatePortLabel(
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("ports.updatePortLabel", error, "Could not update port label");
+  revalidatePath("/canvas", "layout");
 }

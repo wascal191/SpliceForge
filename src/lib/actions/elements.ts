@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext, assertOrgOwnsRow, assertOrgOwnsRows } from "@/lib/guards";
 import {
@@ -54,6 +55,7 @@ export async function createElement(
     .select()
     .single();
   if (error) fail("elements.createElement", error, "Could not create element");
+  revalidatePath("/canvas", "layout");
   return data;
 }
 
@@ -69,6 +71,7 @@ export async function updateElement(id: string, updates: unknown) {
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("elements.updateElement", error, "Could not update element");
+  revalidatePath("/canvas", "layout");
 }
 
 const ElementBatchSchema = z.array(
@@ -92,6 +95,7 @@ export async function updateElementsBatch(rows: unknown) {
         .eq("organization_id", ctx.orgId)
     )
   );
+  revalidatePath("/canvas", "layout");
 }
 
 export async function deleteElement(id: string) {
@@ -105,6 +109,7 @@ export async function deleteElement(id: string) {
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("elements.deleteElement", error, "Could not delete element");
+  revalidatePath("/canvas", "layout");
 }
 
 export async function getElements(pageId: string) {
@@ -149,5 +154,6 @@ export async function updateElementGeo(input: z.infer<typeof UpdateGeoSchema>) {
     .select()
     .single();
   if (error) fail("elements.updateElementGeo", error, "Could not update element geometry");
+  revalidatePath("/canvas", "layout");
   return data;
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext, assertOrgOwnsRow } from "@/lib/guards";
 import { BedsheetName, Uuid, parseOrFail } from "@/lib/validation";
@@ -23,6 +24,7 @@ export async function createBedsheet(projectId: string, name: string) {
     .select()
     .single();
   if (error) fail("bedsheets.createBedsheet", error, "Could not create bedsheet");
+  revalidatePath("/dashboard");
   return data;
 }
 
@@ -68,6 +70,8 @@ export async function renameBedsheet(id: string, name: string) {
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("bedsheets.renameBedsheet", error, "Could not rename bedsheet");
+  revalidatePath("/dashboard");
+  revalidatePath(`/canvas/${cleanId}`);
 }
 
 export async function deleteBedsheet(id: string) {
@@ -81,4 +85,5 @@ export async function deleteBedsheet(id: string) {
     .eq("id", cleanId)
     .eq("organization_id", ctx.orgId);
   if (error) fail("bedsheets.deleteBedsheet", error, "Could not delete bedsheet");
+  revalidatePath("/dashboard");
 }

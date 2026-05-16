@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext, assertOrgOwnsRow } from "@/lib/guards";
 import { Uuid, parseOrFail } from "@/lib/validation";
@@ -71,4 +72,6 @@ export async function updateSpliceWithPropagation(
         .eq("organization_id", ctx.orgId),
     ]);
   }
+
+  revalidatePath("/canvas", "layout");
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, memo, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Handle, Position, useReactFlow } from "@xyflow/react";
 import type { NodeProps, Node } from "@xyflow/react";
 import { getFiberHex, type FiberColorScheme } from "@/lib/fiber/colors";
@@ -19,6 +20,8 @@ function ClosureNodeBase({
   data,
   selected,
 }: NodeProps<Node<ClosureNodeData, "closure">>) {
+  const t = useTranslations("canvas.node");
+  const tCommon = useTranslations("common");
   const { label, inputCount, outputCount, ports } = data;
   const trayCount = (data.trayCount as number | undefined) ?? 1;
   const collapsed = (data.collapsed as boolean | undefined) ?? false;
@@ -153,11 +156,11 @@ function ClosureNodeBase({
 
   const menuItems: ContextMenuItem[] = [
     {
-      label: "Rename",
+      label: tCommon("rename"),
       onSelect: () => { setLabelDraft(label); setEditingLabel(true); },
     },
     {
-      label: collapsed ? "Expand node" : "Collapse node",
+      label: collapsed ? t("expandNode") : t("collapseNode"),
       onSelect: async () => {
         const next = !collapsed;
         setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, collapsed: next } } : n));
@@ -165,14 +168,14 @@ function ClosureNodeBase({
       },
     },
     {
-      label: "Expand all trays",
+      label: t("closure.expandAllTrays"),
       onSelect: async () => {
         setCollapsedTrays(new Set());
         await updateElement(id, { config_json: buildConfig({ collapsedTrays: [] }) });
       },
     },
     {
-      label: "Collapse all trays",
+      label: t("closure.collapseAllTrays"),
       onSelect: async () => {
         const all = Array.from({ length: trayCount }, (_, i) => i);
         setCollapsedTrays(new Set(all));
@@ -180,7 +183,7 @@ function ClosureNodeBase({
       },
     },
     {
-      label: "Trace all connections",
+      label: t("traceAll"),
       onSelect: () => {
         const edges = getEdges();
         for (const port of ports) {
@@ -191,7 +194,7 @@ function ClosureNodeBase({
     },
     geoMenuItem,
     {
-      label: "Delete closure",
+      label: t("deleteClosure"),
       destructive: true,
       separatorBefore: true,
       onSelect: async () => {
@@ -215,7 +218,7 @@ function ClosureNodeBase({
               <button
                 className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center z-10 leading-none"
                 onClick={handleDelete}
-                title="Delete closure"
+                title={t("deleteClosure")}
               >×</button>
             )}
             <div className="bg-muted px-2 py-1.5 flex items-center justify-between gap-2 rounded-md">
@@ -242,7 +245,7 @@ function ClosureNodeBase({
             <button
               className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center z-10 leading-none"
               onClick={handleDelete}
-              title="Delete closure"
+              title={t("deleteClosure")}
             >×</button>
           )}
 
@@ -267,7 +270,7 @@ function ClosureNodeBase({
             ) : (
               <span
                 className="text-[11px] font-semibold truncate cursor-text flex-1 min-w-0"
-                title="Double-click to rename"
+                title={t("doubleClickRename")}
                 onDoubleClick={(e) => {
                   e.stopPropagation();
                   setLabelDraft(label);
@@ -317,7 +320,7 @@ function ClosureNodeBase({
                 {/* Tray header row */}
                 <ContextMenu items={[
                   {
-                    label: "Clear all splices in this tray",
+                    label: t("closure.clearTraySplices"),
                     destructive: true,
                     onSelect: () => clearTraySplices(trayPorts),
                   },
@@ -342,7 +345,7 @@ function ClosureNodeBase({
                       </span>
                       <button
                         className="opacity-0 group-hover:opacity-100 text-[10px] text-muted-foreground hover:text-foreground w-4 text-center leading-none shrink-0"
-                        title="Edit tray note"
+                        title={t("closure.editTrayNote")}
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingTrayNote(trayIdx);
@@ -358,7 +361,7 @@ function ClosureNodeBase({
                   <div className="px-2 pb-1" onClick={(e) => e.stopPropagation()}>
                     <input
                       className="w-full text-[10px] border rounded px-1.5 py-0.5 bg-background outline-none focus:ring-1 focus:ring-primary"
-                      placeholder="Tray note (e.g. Buffer Azul)"
+                      placeholder={t("closure.trayNotePlaceholder")}
                       value={trayNoteDraft}
                       autoFocus
                       onChange={(e) => setTrayNoteDraft(e.target.value)}

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { createProject, deleteProject, updateProject } from "@/lib/actions/projects";
+import { useTranslations, useFormatter } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
+import { deleteProject, updateProject } from "@/lib/actions/projects";
 import { getBedsheets, createBedsheet, renameBedsheet, deleteBedsheet } from "@/lib/actions/bedsheets";
 import { getOrgMembers, updateMemberRole, removeMember, type OrgMember } from "@/lib/actions/organizations";
 import { createInviteToken, getInviteToken, revokeInviteToken } from "@/lib/actions/invites";
@@ -25,6 +26,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { NewProjectWizard } from "@/components/dashboard/NewProjectWizard";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
 const F = "var(--font-inter), sans-serif";
 const FM = "var(--font-geist-mono), monospace";
@@ -109,11 +112,11 @@ function FMBadge({ tone, children }: { tone: string; children: React.ReactNode }
   );
 }
 
-const NAV_ITEMS: { icon: DashIconName; label: string }[] = [
-  { icon: "grid",    label: "Projects" },
-  { icon: "history", label: "Recent" },
-  { icon: "users",   label: "Team" },
-  { icon: "folder",  label: "Templates" },
+const NAV_ITEM_ICONS: { icon: DashIconName; key: "projects" | "recent" | "team" | "templates" }[] = [
+  { icon: "grid",    key: "projects" },
+  { icon: "history", key: "recent" },
+  { icon: "users",   key: "team" },
+  { icon: "folder",  key: "templates" },
 ];
 
 function timeAgo(dateStr: string) {
@@ -160,6 +163,7 @@ function MiniPreview({ id, color }: { id: string; color: string }) {
 
 // 3-dots dropdown
 function ProjectMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const t = useTranslations("dashboard.projects.menu");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -201,7 +205,7 @@ function ProjectMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () =>
               borderBottom: "1px solid rgba(148,184,255,0.08)",
             }}
           >
-            <FMIcon name="edit" size={13} color="#94A3B8" /> Rename / Edit
+            <FMIcon name="edit" size={13} color="#94A3B8" /> {t("renameEdit")}
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete(); }}
@@ -211,7 +215,7 @@ function ProjectMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () =>
               color: "#F87171", fontFamily: F, fontSize: 12.5, cursor: "pointer",
             }}
           >
-            <FMIcon name="trash" size={13} color="#F87171" /> Delete project
+            <FMIcon name="trash" size={13} color="#F87171" /> {t("deleteProject")}
           </button>
         </div>
       )}
@@ -228,6 +232,7 @@ function UserMenu({
   userName: string | null;
   organization: { id: string; name: string; plan: string } | null;
 }) {
+  const t = useTranslations("dashboard.team");
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -296,7 +301,7 @@ function UserMenu({
                   {userEmail ?? "—"}
                 </div>
                 <div style={{ fontFamily: FM, fontSize: 9.5, color: "#64748B", marginTop: 1, letterSpacing: "0.04em" }}>
-                  {organization?.name ?? "No organization"}
+                  {organization?.name ?? t("noOrganization")}
                 </div>
               </div>
             </div>
@@ -307,7 +312,7 @@ function UserMenu({
                 display: "flex", alignItems: "center", justifyContent: "space-between",
               }}>
                 <span style={{ fontFamily: FM, fontSize: 9, letterSpacing: "0.08em", color: "#64748B", textTransform: "uppercase" }}>
-                  Plan
+                  {t("plan")}
                 </span>
                 <span style={{ fontFamily: FM, fontSize: 9.5, color: "#00E5FF", letterSpacing: "0.06em", fontWeight: 600 }}>
                   {(organization.plan ?? "free").toUpperCase()}
@@ -315,6 +320,8 @@ function UserMenu({
               </div>
             )}
           </div>
+
+          <LocaleSwitcher />
 
           {/* Actions */}
           <div style={{ padding: "6px 0" }}>
@@ -331,7 +338,7 @@ function UserMenu({
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
-              Sign out
+              {t("signOut")}
             </button>
           </div>
         </div>
@@ -364,13 +371,12 @@ export function DashboardClient({
   currentUserRole: string | null;
 }) {
   const router = useRouter();
+  const t = useTranslations("dashboard");
+  const tCommon = useTranslations("common");
+  const format = useFormatter();
 
-  // create dialog
+  // create wizard
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
 
   // edit dialog
   const [editProject, setEditProject] = useState<Project | null>(null);
@@ -407,24 +413,8 @@ export function DashboardClient({
     return true;
   });
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setCreating(true);
-    setCreateError(null);
-    try {
-      await createProject(name.trim(), description.trim() || undefined);
-      setName(""); setDescription(""); setDialogOpen(false);
-      router.refresh();
-    } catch (err) {
-      setCreateError((err as Error).message);
-    } finally {
-      setCreating(false);
-    }
-  }
-
   async function handleDelete(id: string) {
-    if (!confirm("Delete this project? This cannot be undone.")) return;
+    if (!confirm(t("projects.deleteConfirm"))) return;
     try {
       await deleteProject(id);
       router.refresh();
@@ -627,9 +617,9 @@ export function DashboardClient({
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <FMLogo />
           <div style={{ width: 1, height: 18, background: "rgba(148,184,255,0.18)" }} />
-          <span style={{ fontFamily: FM, fontSize: 11, letterSpacing: "0.04em", color: "#64748B" }}>Workspace</span>
+          <span style={{ fontFamily: FM, fontSize: 11, letterSpacing: "0.04em", color: "#64748B" }}>{t("topbar.workspace")}</span>
           <span style={{ color: "#3B4A66", fontSize: 13 }}>/</span>
-          <span style={{ fontFamily: FM, fontSize: 11, letterSpacing: "0.04em", color: "#F1F5F9", fontWeight: 600 }}>Projects</span>
+          <span style={{ fontFamily: FM, fontSize: 11, letterSpacing: "0.04em", color: "#F1F5F9", fontWeight: 600 }}>{t("topbar.projects")}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
@@ -642,12 +632,12 @@ export function DashboardClient({
               boxShadow: "0 0 0 1px rgba(0,229,255,0.35), 0 4px 12px rgba(0,229,255,0.25)",
             }}
           >
-            <FMIcon name="plus" size={12} color="#05070C" strokeWidth={2.5} /> New Project
+            <FMIcon name="plus" size={12} color="#05070C" strokeWidth={2.5} /> {t("topbar.newProject")}
           </button>
           <div style={{ width: 1, height: 18, background: "rgba(148,184,255,0.14)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#3DF5A3", boxShadow: "0 0 4px #3DF5A3" }} />
-            <span style={{ fontFamily: FM, fontSize: 10, color: "#64748B", letterSpacing: "0.04em" }}>Synced</span>
+            <span style={{ fontFamily: FM, fontSize: 10, color: "#64748B", letterSpacing: "0.04em" }}>{t("topbar.synced")}</span>
           </div>
           <button style={{ background: "transparent", border: "none", color: "#64748B", cursor: "pointer", padding: 4 }}>
             <FMIcon name="bell" size={15} color="#64748B" />
@@ -666,14 +656,14 @@ export function DashboardClient({
           display: "flex", flexDirection: "column", padding: "16px 12px",
         }}>
           <div style={{ padding: "8px 10px 12px", marginBottom: 4 }}>
-            <div style={{ fontFamily: FM, fontSize: 9, letterSpacing: "0.18em", color: "#64748B", marginBottom: 6, textTransform: "uppercase" }}>WORKSPACE</div>
+            <div style={{ fontFamily: FM, fontSize: 9, letterSpacing: "0.18em", color: "#64748B", marginBottom: 6, textTransform: "uppercase" }}>{t("nav.workspace")}</div>
             <div style={{ fontSize: 13, fontWeight: 600, color: "#F1F5F9" }}>{organization?.name ?? "My Workspace"}</div>
             <div style={{ fontSize: 10.5, color: "#64748B", marginTop: 1 }}>
-              {initialProjects.length} project{initialProjects.length !== 1 ? "s" : ""}
+              {t("stats.projectsTotal", { count: initialProjects.length })}
             </div>
           </div>
 
-          {NAV_ITEMS.map((item, i) => {
+          {NAV_ITEM_ICONS.map((item, i) => {
             const view = i === 0 ? "projects" : i === 2 ? "team" : null;
             const active = view ? activeView === view : false;
             return (
@@ -690,16 +680,16 @@ export function DashboardClient({
                 boxShadow: active ? "0 0 12px rgba(0,229,255,0.12)" : "none",
               }}>
                 <FMIcon name={item.icon} size={14} color={active ? "#00E5FF" : "#64748B"} />
-                {item.label}
+                {t(`nav.${item.key}`)}
               </button>
             );
           })}
 
           <div style={{ margin: "12px 0", height: 1, background: "rgba(148,184,255,0.08)" }} />
 
-          <div style={{ fontFamily: FM, fontSize: 9, letterSpacing: "0.18em", color: "#64748B", padding: "0 10px", marginBottom: 8, textTransform: "uppercase" }}>RECENT</div>
+          <div style={{ fontFamily: FM, fontSize: 9, letterSpacing: "0.18em", color: "#64748B", padding: "0 10px", marginBottom: 8, textTransform: "uppercase" }}>{t("nav.recent")}</div>
           {recentProjects.length === 0 && (
-            <div style={{ padding: "6px 10px", fontSize: 10.5, color: "#3B4A66", fontFamily: F }}>No projects yet</div>
+            <div style={{ padding: "6px 10px", fontSize: 10.5, color: "#3B4A66", fontFamily: F }}>{t("nav.noProjects")}</div>
           )}
           {recentProjects.map((p) => {
             const color = getProjectColor(p.id);
@@ -730,8 +720,8 @@ export function DashboardClient({
           {activeView === "team" && (
             <div>
               <div style={{ marginBottom: 28 }}>
-                <div style={{ fontFamily: FM, fontSize: 9.5, letterSpacing: "0.22em", color: "#00E5FF", marginBottom: 6, textTransform: "uppercase" }}>Your workspace</div>
-                <h1 style={{ fontFamily: F, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "#F1F5F9", margin: 0 }}>Team</h1>
+                <div style={{ fontFamily: FM, fontSize: 9.5, letterSpacing: "0.22em", color: "#00E5FF", marginBottom: 6, textTransform: "uppercase" }}>{t("team.yourWorkspace")}</div>
+                <h1 style={{ fontFamily: F, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "#F1F5F9", margin: 0 }}>{t("team.title")}</h1>
               </div>
 
               {teamError && (
@@ -743,7 +733,7 @@ export function DashboardClient({
               {/* Invite link section — owner only */}
               {isOwner && (
                 <div style={{ background: "linear-gradient(180deg, rgba(15,22,36,0.9), rgba(10,15,26,0.7))", border: "1px solid rgba(148,184,255,0.12)", borderRadius: 12, padding: "20px 22px", marginBottom: 20 }}>
-                  <div style={{ fontFamily: FM, fontSize: 9.5, letterSpacing: "0.16em", color: "#64748B", textTransform: "uppercase", marginBottom: 12 }}>Invite Link</div>
+                  <div style={{ fontFamily: FM, fontSize: 9.5, letterSpacing: "0.16em", color: "#64748B", textTransform: "uppercase", marginBottom: 12 }}>{t("team.inviteLink")}</div>
                   {invite && invite !== "none" ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       {invite.token ? (
@@ -755,54 +745,57 @@ export function DashboardClient({
                             onClick={() => copyInviteLink(invite.token!)}
                             style={{ flexShrink: 0, height: 36, padding: "0 14px", background: copied ? "rgba(61,245,163,0.15)" : "rgba(0,229,255,0.1)", border: `1px solid ${copied ? "rgba(61,245,163,0.3)" : "rgba(0,229,255,0.25)"}`, borderRadius: 7, color: copied ? "#3DF5A3" : "#00E5FF", fontFamily: F, fontWeight: 600, fontSize: 12, cursor: "pointer" }}
                           >
-                            {copied ? "Copied!" : "Copy"}
+                            {copied ? t("team.copied") : t("team.copy")}
                           </button>
                           <button
                             onClick={handleRevokeInvite}
                             disabled={inviteLoading}
                             style={{ flexShrink: 0, height: 36, padding: "0 12px", background: "transparent", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 7, color: "#F87171", fontFamily: F, fontSize: 12, cursor: "pointer" }}
                           >
-                            Revoke
+                            {t("team.revoke")}
                           </button>
                         </div>
                       ) : (
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <p style={{ fontFamily: F, fontSize: 12, color: "#64748B", margin: 0, flex: 1 }}>
-                            An active invite link exists. For security, the URL is not stored on the server — regenerate to get a fresh link.
+                            {t("team.activeInviteExists")}
                           </p>
                           <button
                             onClick={handleGenerateInvite}
                             disabled={inviteLoading}
                             style={{ flexShrink: 0, height: 36, padding: "0 14px", background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.25)", borderRadius: 7, color: "#00E5FF", fontFamily: F, fontWeight: 600, fontSize: 12, cursor: "pointer" }}
                           >
-                            {inviteLoading ? "…" : "Regenerate"}
+                            {inviteLoading ? "…" : t("team.regenerate")}
                           </button>
                           <button
                             onClick={handleRevokeInvite}
                             disabled={inviteLoading}
                             style={{ flexShrink: 0, height: 36, padding: "0 12px", background: "transparent", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 7, color: "#F87171", fontFamily: F, fontSize: 12, cursor: "pointer" }}
                           >
-                            Revoke
+                            {t("team.revoke")}
                           </button>
                         </div>
                       )}
                       <p style={{ fontFamily: F, fontSize: 11.5, color: "#64748B", margin: 0 }}>
-                        Share this link with anyone you want to add. They will join as <strong style={{ color: "#CBD5E1" }}>Editor</strong>. Expires {new Date(invite.expires_at).toLocaleDateString()}.
+                        {t.rich("team.shareInviteHint", {
+                          role: () => <strong style={{ color: "#CBD5E1" }}>{t("team.editor")}</strong>,
+                          date: format.dateTime(new Date(invite.expires_at), { dateStyle: "medium" }),
+                        })}
                       </p>
                     </div>
                   ) : invite === null ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <p style={{ fontFamily: F, fontSize: 13, color: "#64748B", margin: 0, flex: 1 }}>No active invite link. Generate one to share with your team.</p>
+                      <p style={{ fontFamily: F, fontSize: 13, color: "#64748B", margin: 0, flex: 1 }}>{t("team.noActiveInvite")}</p>
                       <button
                         onClick={handleGenerateInvite}
                         disabled={inviteLoading}
                         style={{ flexShrink: 0, height: 36, padding: "0 16px", background: "linear-gradient(135deg, #00C8E0, #00E5FF)", border: "none", borderRadius: 7, color: "#05070C", fontFamily: F, fontWeight: 700, fontSize: 12, cursor: "pointer" }}
                       >
-                        {inviteLoading ? "Generating…" : "Generate Link"}
+                        {inviteLoading ? t("team.generating") : t("team.generateLink")}
                       </button>
                     </div>
                   ) : (
-                    <div style={{ fontFamily: FM, fontSize: 11, color: "#64748B" }}>Loading…</div>
+                    <div style={{ fontFamily: FM, fontSize: 11, color: "#64748B" }}>{t("team.loading")}</div>
                   )}
                 </div>
               )}
@@ -810,12 +803,12 @@ export function DashboardClient({
               {/* Members list */}
               <div style={{ background: "linear-gradient(180deg, rgba(15,22,36,0.9), rgba(10,15,26,0.7))", border: "1px solid rgba(148,184,255,0.12)", borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ padding: "16px 22px", borderBottom: "1px solid rgba(148,184,255,0.08)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontFamily: FM, fontSize: 9.5, letterSpacing: "0.16em", color: "#64748B", textTransform: "uppercase" }}>Members · {members.length}</span>
-                  {!isOwner && <span style={{ fontFamily: FM, fontSize: 9.5, color: "#3B4A66", letterSpacing: "0.06em" }}>View only</span>}
+                  <span style={{ fontFamily: FM, fontSize: 9.5, letterSpacing: "0.16em", color: "#64748B", textTransform: "uppercase" }}>{t("team.members")} · {members.length}</span>
+                  {!isOwner && <span style={{ fontFamily: FM, fontSize: 9.5, color: "#3B4A66", letterSpacing: "0.06em" }}>{t("team.viewOnly")}</span>}
                 </div>
 
                 {membersLoading ? (
-                  <div style={{ padding: "24px 22px", fontFamily: FM, fontSize: 11, color: "#64748B" }}>Loading members…</div>
+                  <div style={{ padding: "24px 22px", fontFamily: FM, fontSize: 11, color: "#64748B" }}>{t("team.loadingMembers")}</div>
                 ) : members.map((member) => {
                   const display = member.full_name || member.email || "Unknown";
                   const initial = display[0].toUpperCase();
@@ -838,7 +831,7 @@ export function DashboardClient({
                           <span style={{ fontFamily: F, fontSize: 13.5, fontWeight: 600, color: "#F1F5F9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {member.full_name ?? member.email ?? "Unknown"}
                           </span>
-                          {isSelf && <span style={{ fontFamily: FM, fontSize: 9, color: "#64748B", border: "1px solid rgba(148,184,255,0.2)", borderRadius: 4, padding: "1px 5px" }}>you</span>}
+                          {isSelf && <span style={{ fontFamily: FM, fontSize: 9, color: "#64748B", border: "1px solid rgba(148,184,255,0.2)", borderRadius: 4, padding: "1px 5px" }}>{t("team.you")}</span>}
                         </div>
                         {member.full_name && <div style={{ fontFamily: FM, fontSize: 11, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{member.email}</div>}
                       </div>
@@ -849,13 +842,13 @@ export function DashboardClient({
                           onChange={(e) => handleRoleChange(member.id, e.target.value)}
                           style={{ background: rc.bg, border: `1px solid ${rc.border}`, borderRadius: 6, padding: "4px 8px", color: rc.text, fontFamily: FM, fontSize: 10, letterSpacing: "0.06em", cursor: "pointer", outline: "none" }}
                         >
-                          <option value="owner">OWNER</option>
-                          <option value="editor">EDITOR</option>
-                          <option value="viewer">VIEWER</option>
+                          <option value="owner">{t("team.roleOwner")}</option>
+                          <option value="editor">{t("team.roleEditor")}</option>
+                          <option value="viewer">{t("team.roleViewer")}</option>
                         </select>
                       ) : (
                         <span style={{ background: rc.bg, border: `1px solid ${rc.border}`, borderRadius: 6, padding: "4px 8px", color: rc.text, fontFamily: FM, fontSize: 10, letterSpacing: "0.06em" }}>
-                          {member.role.toUpperCase()}
+                          {member.role === "owner" ? t("team.roleOwner") : member.role === "editor" ? t("team.roleEditor") : t("team.roleViewer")}
                         </span>
                       )}
                       {/* Joined */}
@@ -866,7 +859,7 @@ export function DashboardClient({
                       {isOwner && !isSelf && (
                         <button
                           onClick={() => handleRemoveMember(member.id)}
-                          title="Remove member"
+                          title={t("team.removeMember")}
                           style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: "#64748B", borderRadius: 4, display: "flex", alignItems: "center", flexShrink: 0 }}
                         >
                           <FMIcon name="trash" size={13} color="#64748B" />
@@ -883,20 +876,20 @@ export function DashboardClient({
           {activeView === "projects" && <>
           {/* Header */}
           <div style={{ marginBottom: 28 }}>
-            <div style={{ fontFamily: FM, fontSize: 9.5, letterSpacing: "0.22em", color: "#00E5FF", marginBottom: 6, textTransform: "uppercase" }}>Your workspace</div>
+            <div style={{ fontFamily: FM, fontSize: 9.5, letterSpacing: "0.22em", color: "#00E5FF", marginBottom: 6, textTransform: "uppercase" }}>{t("projects.yourWorkspace")}</div>
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-              <h1 style={{ fontFamily: F, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "#F1F5F9", margin: 0 }}>Projects</h1>
-              <div style={{ fontFamily: FM, fontSize: 10.5, color: "#64748B", letterSpacing: "0.04em" }}>Last updated {today}</div>
+              <h1 style={{ fontFamily: F, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "#F1F5F9", margin: 0 }}>{t("projects.title")}</h1>
+              <div style={{ fontFamily: FM, fontSize: 10.5, color: "#64748B", letterSpacing: "0.04em" }}>{t("projects.lastUpdated", { date: today })}</div>
             </div>
           </div>
 
           {/* Stats row */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
             {[
-              { label: "Total Projects",  val: initialProjects.length,    icon: "folder" as DashIconName, color: "#00E5FF", sub: `${initialProjects.length} total` },
-              { label: "Total Fibers",    val: formatFibers(totalFibers),  icon: "cable" as DashIconName,  color: "#3DF5A3", sub: "across all projects" },
-              { label: "Total Cables",    val: totalCables,                icon: "cable" as DashIconName,  color: "#FCD34D", sub: totalCables === 0 ? "no cables yet" : "cable elements" },
-              { label: "Team Members",    val: 1,                          icon: "users" as DashIconName,  color: "#C4A7FF", sub: "online now" },
+              { label: t("stats.totalProjects"),  val: initialProjects.length,    icon: "folder" as DashIconName, color: "#00E5FF", sub: t("stats.projectsTotal", { count: initialProjects.length }) },
+              { label: t("stats.totalFibers"),    val: formatFibers(totalFibers), icon: "cable" as DashIconName,  color: "#3DF5A3", sub: t("stats.acrossAllProjects") },
+              { label: t("stats.totalCables"),    val: totalCables,               icon: "cable" as DashIconName,  color: "#FCD34D", sub: totalCables === 0 ? t("stats.noCablesYet") : t("stats.cableElements") },
+              { label: t("stats.teamMembers"),    val: 1,                         icon: "users" as DashIconName,  color: "#C4A7FF", sub: t("stats.onlineNow") },
             ].map((s, i) => (
               <div key={i} style={{
                 padding: "16px 18px",
@@ -927,7 +920,7 @@ export function DashboardClient({
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search projects…"
+                placeholder={t("projects.searchPlaceholder")}
                 style={{
                   width: "100%", height: 34, paddingLeft: 32, paddingRight: 12,
                   background: "rgba(15,22,36,0.8)", border: "1px solid rgba(148,184,255,0.16)",
@@ -938,7 +931,7 @@ export function DashboardClient({
             </div>
             <div style={{ display: "inline-flex", background: "rgba(148,184,255,0.06)", border: "1px solid rgba(148,184,255,0.12)", borderRadius: 8, padding: 2 }}>
               {(["all", "active", "draft"] as const).map((k) => {
-                const labels = { all: "All", active: "Active", draft: "Draft" };
+                const labels = { all: t("projects.filter.all"), active: t("projects.filter.active"), draft: t("projects.filter.draft") };
                 const active = filter === k;
                 return (
                   <button key={k} onClick={() => setFilter(k)} style={{
@@ -954,7 +947,7 @@ export function DashboardClient({
               })}
             </div>
             <button style={{ height: 34, padding: "0 14px", background: "rgba(148,184,255,0.06)", border: "1px solid rgba(148,184,255,0.14)", borderRadius: 8, color: "#94A3B8", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontFamily: F, fontSize: 12 }}>
-              <FMIcon name="filter" size={12} color="#94A3B8" /> Sort
+              <FMIcon name="filter" size={12} color="#94A3B8" /> {t("projects.sort")}
             </button>
           </div>
 
@@ -986,13 +979,13 @@ export function DashboardClient({
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
                         <div style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: "#F1F5F9", letterSpacing: "-0.01em" }}>{project.name}</div>
-                        <FMBadge tone="ok">Active</FMBadge>
+                        <FMBadge tone="ok">{t("projects.active")}</FMBadge>
                       </div>
                       {project.description && (
                         <div style={{ fontSize: 12.5, color: "#94A3B8", marginBottom: 8 }}>{project.description}</div>
                       )}
                       <div style={{ display: "flex", gap: 12, fontFamily: FM, fontSize: 10.5, color: "#64748B" }}>
-                        <span>created <span style={{ color: "#CBD5E1" }}>{timeAgo(project.created_at)}</span></span>
+                        <span>{t("projects.createdAgo")} <span style={{ color: "#CBD5E1" }}>{timeAgo(project.created_at)}</span></span>
                       </div>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
@@ -1023,7 +1016,7 @@ export function DashboardClient({
                     pointerEvents: "none",
                   }}>
                     <FMIcon name="folder" size={10} color="#3B4A66" />
-                    <span>{sheetsMap[project.id] !== undefined ? `${sheets.length} sheet${sheets.length !== 1 ? "s" : ""}` : "Sheets"}</span>
+                    <span>{sheetsMap[project.id] !== undefined ? t("projects.sheetCount", { count: sheets.length }) : t("projects.sheets")}</span>
                     <span style={{ marginLeft: "auto", fontSize: 9 }}>{isExpanded ? "▲" : "▼"}</span>
                   </div>
 
@@ -1031,9 +1024,9 @@ export function DashboardClient({
                   {isExpanded && (
                     <div style={{ marginTop: 8 }} onClick={(e) => e.stopPropagation()}>
                       {loadingSheets === project.id ? (
-                        <span style={{ fontFamily: FM, fontSize: 10, color: "#64748B", padding: "4px 8px", display: "block" }}>Loading…</span>
+                        <span style={{ fontFamily: FM, fontSize: 10, color: "#64748B", padding: "4px 8px", display: "block" }}>{t("team.loading")}</span>
                       ) : sheets.length === 0 ? (
-                        <span style={{ fontFamily: FM, fontSize: 10, color: "#3B4A66", padding: "4px 8px", display: "block" }}>No sheets yet</span>
+                        <span style={{ fontFamily: FM, fontSize: 10, color: "#3B4A66", padding: "4px 8px", display: "block" }}>{t("projects.noSheetsYet")}</span>
                       ) : sheets.map((sheet) => (
                         <div
                           key={sheet.id}
@@ -1075,14 +1068,14 @@ export function DashboardClient({
                           )}
                           <button
                             onClick={() => { setRenamingSheetId(sheet.id); setRenameSheetValue(sheet.name); }}
-                            title="Rename"
+                            title={tCommon("edit")}
                             style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: "#64748B", borderRadius: 4, display: "flex", alignItems: "center" }}
                           >
                             <FMIcon name="edit" size={11} color="#64748B" />
                           </button>
                           <button
                             onClick={(e) => handleDeleteSheet(e, sheet.id, project.id)}
-                            title="Delete sheet"
+                            title={tCommon("delete")}
                             style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: "#64748B", borderRadius: 4, display: "flex", alignItems: "center" }}
                           >
                             <FMIcon name="trash" size={11} color="#64748B" />
@@ -1102,7 +1095,7 @@ export function DashboardClient({
                         }}
                       >
                         <FMIcon name="plus" size={10} color="#64748B" />
-                        {addingSheet === project.id ? "Adding…" : "New Sheet"}
+                        {addingSheet === project.id ? t("projects.adding") : t("projects.newSheet")}
                       </button>
                     </div>
                   )}
@@ -1123,14 +1116,14 @@ export function DashboardClient({
                 <FMIcon name="plus" size={20} color="#00E5FF" strokeWidth={1.5} />
               </div>
               <div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#94A3B8", fontFamily: F }}>New Project</div>
-                <div style={{ fontSize: 12, color: "#64748B", marginTop: 2, fontFamily: F }}>Start from scratch or import from Visio / AutoCAD</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#94A3B8", fontFamily: F }}>{t("projects.newProjectTitle")}</div>
+                <div style={{ fontSize: 12, color: "#64748B", marginTop: 2, fontFamily: F }}>{t("projects.newProjectSubtitle")}</div>
               </div>
             </div>
 
             {filtered.length === 0 && initialProjects.length > 0 && (
               <div style={{ textAlign: "center", padding: "40px 0", color: "#64748B", fontFamily: F, fontSize: 13 }}>
-                No projects match your search.
+                {t("projects.noProjectsMatchSearch")}
               </div>
             )}
           </div>
@@ -1138,45 +1131,26 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* Create dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>New Project</DialogTitle></DialogHeader>
-          <form onSubmit={handleCreate} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="project-name">Name</Label>
-              <Input id="project-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Downtown Fiber Build" autoFocus />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="project-desc">Description (optional)</Label>
-              <Input id="project-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Phase 1 feeder installation" />
-            </div>
-            {createError && <p className="text-destructive text-sm">{createError}</p>}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={!name.trim() || creating}>{creating ? "Creating…" : "Create"}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Create wizard */}
+      <NewProjectWizard open={dialogOpen} onOpenChange={setDialogOpen} />
 
       {/* Edit dialog */}
       <Dialog open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Edit Project</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("projects.editTitle")}</DialogTitle></DialogHeader>
           <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-name">Name</Label>
-              <Input id="edit-name" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Project name" autoFocus />
+              <Label htmlFor="edit-name">{t("projects.name")}</Label>
+              <Input id="edit-name" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t("projects.namePlaceholder")} autoFocus />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-desc">Description (optional)</Label>
-              <Input id="edit-desc" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="e.g. Phase 1 feeder installation" />
+              <Label htmlFor="edit-desc">{t("projects.description")}</Label>
+              <Input id="edit-desc" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder={t("projects.descriptionPlaceholder")} />
             </div>
             {editError && <p className="text-destructive text-sm">{editError}</p>}
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditProject(null)}>Cancel</Button>
-              <Button type="submit" disabled={!editName.trim() || saving}>{saving ? "Saving…" : "Save changes"}</Button>
+              <Button type="button" variant="outline" onClick={() => setEditProject(null)}>{tCommon("cancel")}</Button>
+              <Button type="submit" disabled={!editName.trim() || saving}>{saving ? t("projects.saving") : t("projects.saveChanges")}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

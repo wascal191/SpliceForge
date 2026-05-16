@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { useCanvasStore } from "@/store/canvasStore";
 
 const ELEMENT_TYPES = ["cable", "closure", "splitter", "equipment", "continuation"] as const;
@@ -30,6 +31,15 @@ export const LayerControls = React.memo(function LayerControls({
   hasTrace,
 }: Props) {
   const darkMode = useCanvasStore((s) => s.darkMode);
+  const t = useTranslations("canvas.map");
+
+  const typeLabel: Record<EType, string> = {
+    cable: t("layerCables"),
+    closure: t("layerClosures"),
+    splitter: t("layerSplitters"),
+    equipment: t("layerEquipment"),
+    continuation: t("layerCrossings"),
+  };
 
   return (
     <div
@@ -50,7 +60,7 @@ export const LayerControls = React.memo(function LayerControls({
       }}
     >
       <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", color: darkMode ? "#475569" : "#94a3b8", textTransform: "uppercase", marginBottom: 2 }}>
-        Layers
+        {t("layers")}
       </div>
 
       {ELEMENT_TYPES.map((t) => (
@@ -77,8 +87,8 @@ export const LayerControls = React.memo(function LayerControls({
             checked={visibleTypes.has(t)}
             onChange={() => onToggleType(t)}
           />
-          <span style={{ opacity: visibleTypes.has(t) ? 1 : 0.45, textTransform: "capitalize" }}>
-            {t === "continuation" ? "Crossings" : t + "s"}
+          <span style={{ opacity: visibleTypes.has(t) ? 1 : 0.45 }}>
+            {typeLabel[t]}
           </span>
         </label>
       ))}
@@ -101,7 +111,7 @@ export const LayerControls = React.memo(function LayerControls({
               onChange={onToggleTraceOnly}
               style={{ accentColor: "#22d3ee" }}
             />
-            Trace only
+            {t("traceOnly")}
           </label>
         </>
       )}

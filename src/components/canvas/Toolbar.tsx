@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -16,11 +17,7 @@ import type { LibraryCable } from "@/lib/actions/library";
 import { toast } from "sonner";
 
 const FIBER_COUNTS = [12, 24, 48, 96, 144, 288, 432, 864, 1728];
-const MODULE_OPTIONS = [
-  { label: "No modules", value: 0 },
-  { label: "12 fibers / module", value: 12 },
-  { label: "24 fibers / module", value: 24 },
-];
+const MODULE_VALUES = [0, 12, 24] as const;
 
 type Page = { id: string; page_index: number; title: string | null };
 
@@ -54,6 +51,8 @@ function buildFiberPorts(
 }
 
 export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChange, onRangeSplice }: Props) {
+  const t = useTranslations("canvas.toolbar");
+  const tCommon = useTranslations("common");
   const darkMode = useCanvasStore((s) => s.darkMode);
   const toggleDarkMode = useCanvasStore((s) => s.toggleDarkMode);
   const searchQuery = useCanvasStore((s) => s.searchQuery);
@@ -181,8 +180,8 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       setCableLabel("Cable"); setFiberCount(12); setColorScheme("EIA598");
       setModuleFiberCount(0); setCableQty(1);
     } catch (err) {
-      toast.error("Failed to add cable", {
-        description: err instanceof Error ? err.message : "Could not save the cable.",
+      toast.error(t("toasts.addCableFailed"), {
+        description: err instanceof Error ? err.message : t("toasts.addCableFailedDesc"),
       });
     }
   }
@@ -197,8 +196,8 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       );
       setLibraryOpen(false);
     } catch (err) {
-      toast.error("Failed to add from library", {
-        description: err instanceof Error ? err.message : "Could not create the cable.",
+      toast.error(t("toasts.loadLibraryFailed"), {
+        description: err instanceof Error ? err.message : t("toasts.addCableFailedDesc"),
       });
     }
   }
@@ -208,8 +207,8 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       await deleteLibraryCable(id);
       setLibraryItems((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
-      toast.error("Failed to delete library cable", {
-        description: err instanceof Error ? err.message : "Could not remove the cable from the library.",
+      toast.error(t("toasts.deleteLibraryFailed"), {
+        description: err instanceof Error ? err.message : t("toasts.deleteLibraryFailed"),
       });
     }
   }
@@ -235,8 +234,8 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       setSplitterOpen(false);
       setSplitterLabel("Splitter"); setSplitterInputs(1); setSplitterOutputs(8); setSplitterQty(1);
     } catch (err) {
-      toast.error("Failed to add splitter", {
-        description: err instanceof Error ? err.message : "Could not save the splitter.",
+      toast.error(t("toasts.addSplitterFailed"), {
+        description: err instanceof Error ? err.message : t("toasts.addSplitterFailedDesc"),
       });
     }
   }
@@ -261,8 +260,8 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       setEquipOpen(false);
       setEquipLabel("Equipment"); setEquipInputs(2); setEquipOutputs(2); setEquipQty(1);
     } catch (err) {
-      toast.error("Failed to add equipment", {
-        description: err instanceof Error ? err.message : "Could not save the equipment.",
+      toast.error(t("toasts.addEquipmentFailed"), {
+        description: err instanceof Error ? err.message : t("toasts.addEquipmentFailedDesc"),
       });
     }
   }
@@ -289,8 +288,8 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       setClosureOpen(false);
       setClosureLabel("Closure"); setClosurePortsPerSide(12); setClosureTrayCount(1); setClosureQty(1);
     } catch (err) {
-      toast.error("Failed to add closure", {
-        description: err instanceof Error ? err.message : "Could not save the closure.",
+      toast.error(t("toasts.addClosureFailed"), {
+        description: err instanceof Error ? err.message : t("toasts.addClosureFailedDesc"),
       });
     }
   }
@@ -316,8 +315,8 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       setContLabel("Cont.");
       setContTargetId("");
     } catch (err) {
-      toast.error("Failed to add continuation", {
-        description: err instanceof Error ? err.message : "Could not create the continuation node.",
+      toast.error(t("toasts.addContinuationFailed"), {
+        description: err instanceof Error ? err.message : t("toasts.addContinuationFailedDesc"),
       });
     }
   }
@@ -413,21 +412,21 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
   return (
     <>
       {/* ── Floating pill toolbar ── */}
-      <div style={pill}>
+      <div style={pill} data-tour="toolbar">
         {/* Undo / Redo */}
-        <IconBtn onClick={onUndo} disabled={!canUndo} title="Undo (Ctrl+Z)">↩</IconBtn>
-        <IconBtn onClick={onRedo} disabled={!canRedo} title="Redo (Ctrl+Y)">↪</IconBtn>
+        <IconBtn onClick={onUndo} disabled={!canUndo} title={t("undo")}>↩</IconBtn>
+        <IconBtn onClick={onRedo} disabled={!canRedo} title={t("redo")}>↪</IconBtn>
 
         <div style={div_} />
 
         {/* Node creation tools */}
-        <ToolBtn label="Cable"     color="#00E5FF" dot="#00E5FF" onClick={() => setCableOpen(true)} />
-        <ToolBtn label="Library"   color="#22D3EE" dot="#22D3EE" onClick={() => setLibraryOpen(true)} />
-        <ToolBtn label="Splitter"  color="#FCD34D" dot="#FCD34D" onClick={() => setSplitterOpen(true)} />
-        <ToolBtn label="Equipment" color="#3DF5A3" dot="#3DF5A3" onClick={() => setEquipOpen(true)} />
-        <ToolBtn label="Closure"   color="#C4A7FF" dot="#C4A7FF" onClick={() => setClosureOpen(true)} />
+        <ToolBtn label={t("cable")}     color="#00E5FF" dot="#00E5FF" onClick={() => setCableOpen(true)} />
+        <ToolBtn label={t("library")}   color="#22D3EE" dot="#22D3EE" onClick={() => setLibraryOpen(true)} />
+        <ToolBtn label={t("splitter")}  color="#FCD34D" dot="#FCD34D" onClick={() => setSplitterOpen(true)} />
+        <ToolBtn label={t("equipment")} color="#3DF5A3" dot="#3DF5A3" onClick={() => setEquipOpen(true)} />
+        <ToolBtn label={t("closure")}   color="#C4A7FF" dot="#C4A7FF" onClick={() => setClosureOpen(true)} />
         <ToolBtn
-          label="Cont."
+          label={t("continuation")}
           color="#8b5cf6"
           dot="#8b5cf6"
           onClick={() => { setContTargetId(pages.find((p) => p.id !== pageId)?.id ?? ""); setContOpen(true); }}
@@ -437,18 +436,18 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
 
         {/* Mode toggles */}
         <ToggleBtn
-          label={bulkPortSelectMode ? "✕ Bulk" : "Bulk"}
+          label={bulkPortSelectMode ? t("bulkExit") : t("bulk")}
           active={bulkPortSelectMode}
           color="#3DF5A3"
           onClick={() => { if (bulkPortSelectMode) { clearBulkPorts(); setBulkPortSelectMode(false); } else setBulkPortSelectMode(true); }}
-          title="Bulk Connect"
+          title={t("bulkTitle")}
         />
-        <ToolBtn label="Range" color="#FCD34D" onClick={onRangeSplice} title="Range Splice (2 nodes)" />
+        <ToolBtn label={t("range")} color="#FCD34D" onClick={onRangeSplice} title={t("rangeTitle")} />
 
         <div style={div_} />
 
         {/* Utility */}
-        <IconBtn onClick={() => setKeymapOpen(true)} title="Keyboard shortcuts">?</IconBtn>
+        <IconBtn onClick={() => setKeymapOpen(true)} title={t("keyboardShortcuts")}>?</IconBtn>
       </div>
 
       {/* ── Search oval ── */}
@@ -477,7 +476,7 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Escape") setSearchQuery(""); }}
-          placeholder="Search…"
+          placeholder={t("searchPlaceholder")}
           style={{
             background: "transparent", border: "none", outline: "none",
             fontSize: 11.5, fontWeight: 400, width: 120,
@@ -493,7 +492,7 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
               color: darkMode ? "#64748B" : "#94A3B8", fontSize: 14, lineHeight: 1,
               display: "flex", alignItems: "center",
             }}
-            title="Clear search"
+            title={t("clearSearch")}
           >×</button>
         )}
       </div>
@@ -512,12 +511,12 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
           fontFamily: "var(--font-geist-mono, monospace)", letterSpacing: "0.04em",
         }}>
           <span style={{ width: 7, height: 7, borderRadius: 999, background: "#3DF5A3", boxShadow: "0 0 6px #3DF5A3" }} />
-          <span style={{ color: darkMode ? "#CBD5E1" : "#475569" }}>A: <strong style={{ color: darkMode ? "#F1F5F9" : "#0F172A" }}>{bulkPortsA.length}</strong></span>
+          <span style={{ color: darkMode ? "#CBD5E1" : "#475569" }}>{t("bulkStatusA")} <strong style={{ color: darkMode ? "#F1F5F9" : "#0F172A" }}>{bulkPortsA.length}</strong></span>
           <span style={{ color: darkMode ? "#3B4A66" : "#94A3B8" }}>·</span>
           <span style={{ width: 7, height: 7, borderRadius: 999, background: "#C4A7FF", boxShadow: "0 0 6px #C4A7FF" }} />
-          <span style={{ color: darkMode ? "#CBD5E1" : "#475569" }}>B: <strong style={{ color: darkMode ? "#F1F5F9" : "#0F172A" }}>{bulkPortsB.length}</strong></span>
+          <span style={{ color: darkMode ? "#CBD5E1" : "#475569" }}>{t("bulkStatusB")} <strong style={{ color: darkMode ? "#F1F5F9" : "#0F172A" }}>{bulkPortsB.length}</strong></span>
           {bulkPortsA.length > 0 && bulkPortsB.length > 0 && (
-            <span style={{ color: "#64748B" }}>— right-click canvas to connect</span>
+            <span style={{ color: "#64748B" }}>{t("bulkHint")}</span>
           )}
         </div>
       )}
@@ -526,12 +525,12 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       <Dialog open={cableOpen} onOpenChange={setCableOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Add Cable</DialogTitle>
+            <DialogTitle>{t("cableDialog.title")}</DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm">
-              Label
+              {t("cableDialog.label")}
               <input
                 className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
                 value={cableLabel}
@@ -541,20 +540,20 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
             </label>
 
             <label className="flex flex-col gap-1 text-sm">
-              Fiber count
+              {t("cableDialog.fiberCount")}
               <select
                 className="border rounded px-2 py-1 text-sm bg-background outline-none"
                 value={fiberCount}
                 onChange={(e) => setFiberCount(Number(e.target.value))}
               >
                 {FIBER_COUNTS.map((c) => (
-                  <option key={c} value={c}>{c} fibers</option>
+                  <option key={c} value={c}>{t("cableDialog.fibers", { count: c })}</option>
                 ))}
               </select>
             </label>
 
             <label className="flex flex-col gap-1 text-sm">
-              Color standard
+              {t("cableDialog.colorStandard")}
               <select
                 className="border rounded px-2 py-1 text-sm bg-background outline-none"
                 value={colorScheme}
@@ -567,19 +566,21 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
             </label>
 
             <label className="flex flex-col gap-1 text-sm">
-              Module grouping
+              {t("cableDialog.moduleGrouping")}
               <select
                 className="border rounded px-2 py-1 text-sm bg-background outline-none"
                 value={moduleFiberCount}
                 onChange={(e) => setModuleFiberCount(Number(e.target.value))}
               >
-                {MODULE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                {MODULE_VALUES.map((v) => (
+                  <option key={v} value={v}>
+                    {v === 0 ? t("cableDialog.noModules") : t("cableDialog.fibersPerModule", { count: v })}
+                  </option>
                 ))}
               </select>
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              Quantity
+              {t("cableDialog.quantity")}
               <input
                 type="number" min={1} max={50}
                 className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
@@ -590,8 +591,8 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCableOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddCable}>Add {cableQty > 1 ? `${cableQty} Cables` : "Cable"}</Button>
+            <Button variant="outline" onClick={() => setCableOpen(false)}>{tCommon("cancel")}</Button>
+            <Button onClick={handleAddCable}>{t("cableDialog.add", { count: cableQty })}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -600,12 +601,12 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       <Dialog open={libraryOpen} onOpenChange={setLibraryOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Cable Library</DialogTitle>
+            <DialogTitle>{t("libraryDialog.title")}</DialogTitle>
           </DialogHeader>
 
           {libraryItems.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
-              No saved cables. Select a cable node and click &quot;Save to Library&quot;.
+              {t("libraryDialog.empty")}
             </p>
           ) : (
             <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
@@ -625,7 +626,7 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
                   <button
                     className="text-muted-foreground hover:text-destructive text-sm ml-2"
                     onClick={(e) => { e.stopPropagation(); handleDeleteLibrary(cable.id); }}
-                    title="Remove from library"
+                    title={t("libraryDialog.remove")}
                   >×</button>
                 </div>
               ))}
@@ -640,25 +641,25 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       <Dialog open={keymapOpen} onOpenChange={setKeymapOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Keyboard shortcuts</DialogTitle>
+            <DialogTitle>{t("keyboardShortcuts")}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-y-2" style={{ gridTemplateColumns: "auto 1fr" }}>
             {([
-              ["Ctrl+Z", "Undo"],
-              ["Ctrl+Y / Ctrl+Shift+Z", "Redo"],
-              ["Ctrl+C / V", "Copy / paste nodes"],
-              ["Ctrl+A", "Select all"],
-              ["Ctrl+F", "Search"],
-              ["Ctrl+B", "B&W toggle"],
-              ["Ctrl+Shift+F", "Fit view"],
-              ["Ctrl+P", "Switch page (palette)"],
-              ["Alt+Shift+C", "Bulk-splice 2 cables"],
-              ["Delete / Backspace", "Delete selected"],
-              ["Arrow keys", "Nudge 10px"],
-              ["Shift+Arrow", "Nudge 40px"],
-              ["Right-click", "Context menu on node/port/edge"],
-              ["Escape", "Deselect / clear trace"],
-              ["?", "This help"],
+              ["Ctrl+Z", t("shortcuts.undo")],
+              ["Ctrl+Y / Ctrl+Shift+Z", t("shortcuts.redo")],
+              ["Ctrl+C / V", t("shortcuts.copyPaste")],
+              ["Ctrl+A", t("shortcuts.selectAll")],
+              ["Ctrl+F", t("shortcuts.search")],
+              ["Ctrl+B", t("shortcuts.bwToggle")],
+              ["Ctrl+Shift+F", t("shortcuts.fitView")],
+              ["Ctrl+P", t("shortcuts.switchPage")],
+              ["Alt+Shift+C", t("shortcuts.bulkSplice")],
+              ["Delete / Backspace", t("shortcuts.deleteSelected")],
+              ["Arrow keys", t("shortcuts.nudge10")],
+              ["Shift+Arrow", t("shortcuts.nudge40")],
+              ["Right-click", t("shortcuts.contextMenu")],
+              ["Escape", t("shortcuts.deselect")],
+              ["?", t("shortcuts.thisHelp")],
             ] as [string, string][]).map(([key, desc]) => (
               <div key={key} className="contents">
                 <kbd className="text-xs bg-muted rounded px-1.5 py-0.5 font-mono self-start mr-6 whitespace-nowrap">{key}</kbd>
@@ -678,7 +679,7 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
               ref={paletteInputRef}
               autoFocus
               className="w-full border rounded px-2 py-1.5 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
-              placeholder="Switch to page…"
+              placeholder={t("palette.placeholder")}
               value={paletteQuery}
               onChange={(e) => { setPaletteQuery(e.target.value); setPaletteIndex(0); }}
               onKeyDown={(e) => {
@@ -690,7 +691,7 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
           </div>
           <div className="flex flex-col max-h-64 overflow-y-auto pb-2">
             {filteredPages.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No pages match.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{t("palette.noMatch")}</p>
             ) : filteredPages.map((p, i) => (
               <button
                 key={p.id}
@@ -699,7 +700,7 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
                 onMouseEnter={() => setPaletteIndex(i)}
               >
                 <span className="font-medium">{p.title ?? `Page ${p.page_index + 1}`}</span>
-                {p.id === pageId && <span className="ml-2 text-xs text-muted-foreground">current</span>}
+                {p.id === pageId && <span className="ml-2 text-xs text-muted-foreground">{t("palette.current")}</span>}
               </button>
             ))}
           </div>
@@ -710,11 +711,11 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       <Dialog open={splitterOpen} onOpenChange={setSplitterOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Add Splitter</DialogTitle>
+            <DialogTitle>{t("splitterDialog.title")}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm">
-              Label
+              {t("splitterDialog.label")}
               <input
                 className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
                 value={splitterLabel}
@@ -724,7 +725,7 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1 text-sm">
-                Front ports (left)
+                {t("splitterDialog.frontPorts")}
                 <input
                   type="number" min={1} max={256}
                   className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
@@ -733,7 +734,7 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                Back ports (right)
+                {t("splitterDialog.backPorts")}
                 <input
                   type="number" min={1} max={256}
                   className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
@@ -743,10 +744,10 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
               </label>
             </div>
             <p className="text-xs text-muted-foreground">
-              Ratio: {splitterInputs}:{splitterOutputs} &middot; {splitterInputs + splitterOutputs} total ports
+              {t("splitterDialog.ratioInfo", { inputs: splitterInputs, outputs: splitterOutputs, total: splitterInputs + splitterOutputs })}
             </p>
             <label className="flex flex-col gap-1 text-sm">
-              Quantity
+              {t("splitterDialog.quantity")}
               <input
                 type="number" min={1} max={50}
                 className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
@@ -756,8 +757,8 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSplitterOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddSplitter}>Add {splitterQty > 1 ? `${splitterQty} Splitters` : "Splitter"}</Button>
+            <Button variant="outline" onClick={() => setSplitterOpen(false)}>{tCommon("cancel")}</Button>
+            <Button onClick={handleAddSplitter}>{t("splitterDialog.add", { count: splitterQty })}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -766,11 +767,11 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       <Dialog open={equipOpen} onOpenChange={setEquipOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Add Equipment</DialogTitle>
+            <DialogTitle>{t("equipmentDialog.title")}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm">
-              Label
+              {t("equipmentDialog.label")}
               <input
                 className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
                 value={equipLabel}
@@ -780,7 +781,7 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1 text-sm">
-                Front ports (left)
+                {t("equipmentDialog.frontPorts")}
                 <input
                   type="number" min={1} max={256}
                   className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
@@ -789,7 +790,7 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                Back ports (right)
+                {t("equipmentDialog.backPorts")}
                 <input
                   type="number" min={1} max={256}
                   className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
@@ -799,10 +800,10 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
               </label>
             </div>
             <p className="text-xs text-muted-foreground">
-              {equipInputs + equipOutputs} total ports
+              {t("equipmentDialog.totalPorts", { count: equipInputs + equipOutputs })}
             </p>
             <label className="flex flex-col gap-1 text-sm">
-              Quantity
+              {t("equipmentDialog.quantity")}
               <input
                 type="number" min={1} max={50}
                 className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
@@ -812,8 +813,8 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEquipOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddEquipment}>Add {equipQty > 1 ? `${equipQty} Equipment` : "Equipment"}</Button>
+            <Button variant="outline" onClick={() => setEquipOpen(false)}>{tCommon("cancel")}</Button>
+            <Button onClick={handleAddEquipment}>{t("equipmentDialog.add", { count: equipQty })}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -822,50 +823,50 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       <Dialog open={closureOpen} onOpenChange={setClosureOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Add Splice Closure</DialogTitle>
+            <DialogTitle>{t("closureDialog.title")}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm">
-              Label
+              {t("closureDialog.label")}
               <input
                 className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
                 value={closureLabel}
                 onChange={(e) => setClosureLabel(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddClosure()}
-                placeholder="e.g. FOSC-369"
+                placeholder={t("closureDialog.labelPlaceholder")}
               />
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1 text-sm">
-                Trays
+                {t("closureDialog.trays")}
                 <select
                   className="border rounded px-2 py-1 text-sm bg-background outline-none"
                   value={closureTrayCount}
                   onChange={(e) => setClosureTrayCount(Number(e.target.value))}
                 >
                   {[1, 2, 4, 6, 8, 12, 16, 24].map((n) => (
-                    <option key={n} value={n}>{n} {n === 1 ? "tray" : "trays"}</option>
+                    <option key={n} value={n}>{t("closureDialog.trayCount", { count: n })}</option>
                   ))}
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                Ports / tray
+                {t("closureDialog.portsPerTray")}
                 <select
                   className="border rounded px-2 py-1 text-sm bg-background outline-none"
                   value={closurePortsPerSide}
                   onChange={(e) => setClosurePortsPerSide(Number(e.target.value))}
                 >
                   {[6, 12, 24].map((n) => (
-                    <option key={n} value={n}>{n} ports</option>
+                    <option key={n} value={n}>{t("closureDialog.portsCount", { count: n })}</option>
                   ))}
                 </select>
               </label>
             </div>
             <div className="rounded bg-muted px-3 py-2 text-xs text-muted-foreground">
-              {closureTrayCount} tray{closureTrayCount > 1 ? "s" : ""} &middot; {closurePortsPerSide} ports/tray &middot; <strong>{closureTrayCount * closurePortsPerSide} total splice positions</strong>
+              {t("closureDialog.summary", { trays: closureTrayCount, ports: closurePortsPerSide, total: closureTrayCount * closurePortsPerSide })}
             </div>
             <label className="flex flex-col gap-1 text-sm">
-              Quantity
+              {t("closureDialog.quantity")}
               <input
                 type="number" min={1} max={50}
                 className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
@@ -875,8 +876,8 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setClosureOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddClosure}>Add {closureQty > 1 ? `${closureQty} Closures` : "Closure"}</Button>
+            <Button variant="outline" onClick={() => setClosureOpen(false)}>{tCommon("cancel")}</Button>
+            <Button onClick={handleAddClosure}>{t("closureDialog.add", { count: closureQty })}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -885,21 +886,21 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
       <Dialog open={contOpen} onOpenChange={setContOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Add Continuation Node</DialogTitle>
+            <DialogTitle>{t("continuationDialog.title")}</DialogTitle>
           </DialogHeader>
 
           <p className="text-sm text-muted-foreground -mt-1">
-            Links this page to another page for cross-page fiber tracing.
+            {t("continuationDialog.hint")}
           </p>
 
           {pages.filter((p) => p.id !== pageId).length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">
-              You need at least two pages to add a continuation node. Create another page in the sidebar first.
+              {t("continuationDialog.needTwoPages")}
             </p>
           ) : (
             <div className="flex flex-col gap-3">
               <label className="flex flex-col gap-1 text-sm">
-                Label
+                {t("continuationDialog.label")}
                 <input
                   className="border rounded px-2 py-1 text-sm bg-background outline-none focus:ring-1 focus:ring-primary"
                   value={contLabel}
@@ -909,7 +910,7 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
               </label>
 
               <label className="flex flex-col gap-1 text-sm">
-                Target page
+                {t("continuationDialog.targetPage")}
                 <select
                   className="border rounded px-2 py-1 text-sm bg-background outline-none"
                   value={contTargetId}
@@ -928,9 +929,9 @@ export function Toolbar({ pageId, pages, onNodeAdded, onUndo, onRedo, onPageChan
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setContOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setContOpen(false)}>{tCommon("cancel")}</Button>
             {pages.filter((p) => p.id !== pageId).length > 0 && (
-              <Button onClick={handleAddContinuation}>Add Continuation</Button>
+              <Button onClick={handleAddContinuation}>{t("continuationDialog.addBtn")}</Button>
             )}
           </DialogFooter>
         </DialogContent>
