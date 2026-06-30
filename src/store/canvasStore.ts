@@ -67,8 +67,8 @@ type CanvasStore = {
 
   // Organization context (hydrated after login)
   currentOrganizationId: string | null;
-  currentOrganization: { id: string; name: string; plan: string } | null;
-  setCurrentOrganization: (org: { id: string; name: string; plan: string } | null) => void;
+  currentOrganization: { id: string; name: string } | null;
+  setCurrentOrganization: (org: { id: string; name: string } | null) => void;
 
   // Page navigation — registered by FiberCanvas, called by ContinuationNode
   pageNavigator: ((pageId: string) => void) | null;

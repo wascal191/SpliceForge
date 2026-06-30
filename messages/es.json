@@ -34,15 +34,12 @@
       "fullNamePlaceholder": "Juan Pérez",
       "email": "Correo corporativo",
       "emailPlaceholder": "tu@empresa.com",
-      "orgName": "Nombre de la organización",
-      "orgNamePlaceholder": "Acme Telecom",
-      "phone": "Teléfono",
-      "phonePlaceholder": "+1 (555) 000-0000",
+      "orgName": "Nombre de la organización (opcional)",
+      "orgNamePlaceholder": "Déjalo en blanco para un espacio personal",
       "password": "Contraseña",
       "passwordPlaceholder": "Mínimo 8 caracteres",
       "submit": "Crear cuenta",
       "submitting": "Creando cuenta…",
-      "testModeNotice": "Modo prueba · hasta 5 usuarios por organización · gratis",
       "haveAccount": "¿Ya tienes cuenta?",
       "signIn": "Iniciar sesión",
       "checkEmailTitle": "Revisa tu correo",
@@ -50,8 +47,7 @@
       "alreadyConfirmed": "¿Ya confirmaste?",
       "validation": {
         "nameTooLong": "El nombre completo está vacío o es demasiado largo",
-        "orgTooLong": "El nombre de la organización está vacío o es demasiado largo",
-        "invalidPhone": "Número de teléfono inválido",
+        "orgTooLong": "El nombre de la organización es demasiado largo",
         "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
         "signupFailed": "No se pudo crear la cuenta"
       }
@@ -172,7 +168,6 @@
       "roleOwner": "PROPIETARIO",
       "roleEditor": "EDITOR",
       "roleViewer": "OBSERVADOR",
-      "plan": "Plan",
       "noOrganization": "Sin organización",
       "signOut": "Cerrar sesión"
     },

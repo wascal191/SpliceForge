@@ -34,15 +34,12 @@
       "fullNamePlaceholder": "João Silva",
       "email": "E-mail corporativo",
       "emailPlaceholder": "voce@empresa.com",
-      "orgName": "Nome da organização",
-      "orgNamePlaceholder": "Acme Telecom",
-      "phone": "Telefone",
-      "phonePlaceholder": "+55 (11) 0000-0000",
+      "orgName": "Nome da organização (opcional)",
+      "orgNamePlaceholder": "Deixe em branco para um espaço pessoal",
       "password": "Senha",
       "passwordPlaceholder": "Mínimo 8 caracteres",
       "submit": "Criar conta",
       "submitting": "Criando conta…",
-      "testModeNotice": "Modo teste · até 5 usuários por organização · grátis",
       "haveAccount": "Já tem conta?",
       "signIn": "Entrar",
       "checkEmailTitle": "Confira seu e-mail",
@@ -50,8 +47,7 @@
       "alreadyConfirmed": "Já confirmou?",
       "validation": {
         "nameTooLong": "Nome completo vazio ou muito longo",
-        "orgTooLong": "Nome da organização vazio ou muito longo",
-        "invalidPhone": "Telefone inválido",
+        "orgTooLong": "Nome da organização muito longo",
         "passwordTooShort": "A senha precisa ter no mínimo 8 caracteres",
         "signupFailed": "Não foi possível criar a conta"
       }
@@ -172,7 +168,6 @@
       "roleOwner": "PROPRIETÁRIO",
       "roleEditor": "EDITOR",
       "roleViewer": "OBSERVADOR",
-      "plan": "Plano",
       "noOrganization": "Sem organização",
       "signOut": "Sair"
     },

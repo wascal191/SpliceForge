@@ -17,7 +17,6 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [orgName, setOrgName] = useState("");
-  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,10 +29,9 @@ export default function SignupPage() {
     try {
       const trimmedName = fullName.trim();
       const trimmedOrg = orgName.trim();
-      const trimmedPhone = phone.trim();
+      const finalOrg = trimmedOrg.length > 0 ? trimmedOrg : `${trimmedName}'s workspace`;
       if (trimmedName.length < 1 || trimmedName.length > 120) throw new Error(tv("nameTooLong"));
-      if (trimmedOrg.length < 1 || trimmedOrg.length > 120) throw new Error(tv("orgTooLong"));
-      if (trimmedPhone.length > 0 && !/^[+0-9 ()\-]{1,32}$/.test(trimmedPhone)) throw new Error(tv("invalidPhone"));
+      if (trimmedOrg.length > 120) throw new Error(tv("orgTooLong"));
       if (password.length < 8) throw new Error(tv("passwordTooShort"));
 
       // Stamp the current locale into the cookie next-intl reads, so the
@@ -48,8 +46,7 @@ export default function SignupPage() {
         options: {
           data: {
             full_name: trimmedName,
-            company_name: trimmedOrg,
-            phone: trimmedPhone,
+            company_name: finalOrg,
           },
           emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/callback`,
         },
@@ -57,7 +54,7 @@ export default function SignupPage() {
       if (authError) throw authError;
 
       if (data.session) {
-        await createOrganization(orgName.trim() || "My Organization");
+        await createOrganization(finalOrg);
         router.push("/dashboard");
         router.refresh();
       } else {
@@ -150,12 +147,8 @@ export default function SignupPage() {
                 placeholder={t("emailPlaceholder")} style={inputStyle} />
             </Field>
             <Field label={t("orgName")}>
-              <input type="text" required value={orgName} onChange={(e) => setOrgName(e.target.value)}
+              <input type="text" value={orgName} onChange={(e) => setOrgName(e.target.value)}
                 placeholder={t("orgNamePlaceholder")} style={inputStyle} />
-            </Field>
-            <Field label={t("phone")}>
-              <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)}
-                placeholder={t("phonePlaceholder")} style={inputStyle} />
             </Field>
             <Field label={t("password")}>
               <input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)}
@@ -171,14 +164,6 @@ export default function SignupPage() {
                 {error}
               </div>
             )}
-
-            <div style={{
-              background: "rgba(0,229,255,0.05)", border: "1px solid rgba(0,229,255,0.18)",
-              borderRadius: 8, padding: "9px 12px",
-              fontFamily: FM, fontSize: 10, letterSpacing: "0.04em", color: "#64748B",
-            }}>
-              {t("testModeNotice")}
-            </div>
 
             <button
               type="submit"

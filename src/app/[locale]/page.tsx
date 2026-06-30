@@ -3,6 +3,8 @@ import Link from "next/link";
 const F = "var(--font-inter), sans-serif";
 const FM = "var(--font-geist-mono), monospace";
 
+const GITHUB_URL = "https://github.com/wascal191/SpliceForge";
+
 function FMLogo({ size = 24 }: { size?: number }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -18,7 +20,7 @@ function FMLogo({ size = 24 }: { size?: number }) {
   );
 }
 
-type IconName = "cable" | "activity" | "layers" | "share" | "bolt" | "users" | "arrow" | "play" | "check";
+type IconName = "cable" | "activity" | "layers" | "share" | "bolt" | "users" | "arrow" | "play" | "check" | "github" | "heart";
 
 function FMIcon({ name, size = 16, color = "currentColor", strokeWidth = 1.8 }: { name: IconName; size?: number; color?: string; strokeWidth?: number }) {
   return (
@@ -50,6 +52,14 @@ function FMIcon({ name, size = 16, color = "currentColor", strokeWidth = 1.8 }: 
       )}
       {name === "play" && <polygon points="5 3 19 12 5 21 5 3" />}
       {name === "check" && <polyline points="20 6 9 17 4 12" />}
+      {name === "github" && (
+        <path
+          fill={color}
+          stroke="none"
+          d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2c-3.2.69-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.27-5.24-5.66 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.17a11.1 11.1 0 0 1 5.79 0c2.21-1.48 3.18-1.17 3.18-1.17.62 1.58.23 2.75.11 3.04.73.8 1.18 1.82 1.18 3.07 0 4.4-2.7 5.36-5.27 5.65.41.35.78 1.05.78 2.12v3.14c0 .31.21.67.79.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"
+        />
+      )}
+      {name === "heart" && <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />}
     </svg>
   );
 }
@@ -62,20 +72,20 @@ const FIBERS = [
   { d: "M -40 510 C 270 420, 550 590, 870 540 S 1280 560, 1480 510", c: "#3DF5A3", w: 0.8, op: 0.2 },
 ];
 
-const STATS = [
-  { val: "10k+", label: "Engineers" },
-  { val: "2.4M", label: "Fibers mapped" },
-  { val: "180+", label: "ISPs worldwide" },
-  { val: "99.9%", label: "Uptime SLA" },
+const HIGHLIGHTS = [
+  { val: "AGPL-3.0", label: "Open source" },
+  { val: "Self-host", label: "Your data, your servers" },
+  { val: "EN · ES · PT", label: "Localized UI" },
+  { val: "EIA-598", label: "Standards-compliant" },
 ];
 
 const FEATURES: { icon: IconName; color: string; title: string; body: string }[] = [
-  { icon: "cable",    color: "#00E5FF", title: "EIA-598 Color Coding",  body: "Industry-standard 12-color fiber identification baked into every node." },
-  { icon: "activity", color: "#3DF5A3", title: "Live Trace Mode",       body: "Highlight any path end-to-end across splices, splitters, and drops." },
-  { icon: "layers",   color: "#C4A7FF", title: "Multi-page Bedsheets",  body: "Organise large builds across pages with instant canvas switching." },
-  { icon: "share",    color: "#FCD34D", title: "Export & Share",        body: "PDF, PNG, or shareable link — one click, full fidelity output." },
-  { icon: "bolt",     color: "#00E5FF", title: "Snap & Auto-route",     body: "Magnetic port snapping and curved auto-routing keep diagrams clean." },
-  { icon: "users",    color: "#3DF5A3", title: "Team Collaboration",    body: "Live presence, comments, and role-based access for field + office." },
+  { icon: "cable",    color: "#00E5FF", title: "EIA-598 Color Coding",  body: "Industry-standard 12-color fiber identification baked into every node. ABNT, Turkish, Dutch, French, and Ribbon also supported." },
+  { icon: "activity", color: "#3DF5A3", title: "Live Trace Mode",       body: "Highlight any path end-to-end across splices, splitters, and drops with BFS-based tracing." },
+  { icon: "layers",   color: "#C4A7FF", title: "Multi-page Bedsheets",  body: "Organize large builds across pages with cross-page continuation nodes and a grid overview." },
+  { icon: "share",    color: "#FCD34D", title: "Export Anywhere",       body: "PDF, PNG, or XLSX — traced-path or full canvas. Import from XLSX, CSV, GeoJSON, and KMZ." },
+  { icon: "bolt",     color: "#00E5FF", title: "Snap & Auto-route",     body: "Magnetic port snapping, curved auto-routing, undo/redo, copy/paste, and bulk splice keep diagrams clean." },
+  { icon: "users",    color: "#3DF5A3", title: "Team-friendly",         body: "Organizations, roles, and invite tokens for when you're ready to collaborate. Optional — solo works great too." },
 ];
 
 export default function Home() {
@@ -90,21 +100,28 @@ export default function Home() {
       }}>
         <FMLogo size={26} />
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          {["Product", "Pricing", "Docs", "Blog"].map((l) => (
-            <button key={l} style={{ background: "transparent", border: "none", color: "#94A3B8", fontSize: 13, fontFamily: F, fontWeight: 500, padding: "6px 12px", borderRadius: 6, cursor: "pointer" }}>{l}</button>
-          ))}
+          <Link href="/demo" style={{ background: "transparent", color: "#94A3B8", fontSize: 13, fontFamily: F, fontWeight: 500, padding: "6px 12px", borderRadius: 6, textDecoration: "none" }}>
+            Demo
+          </Link>
+          <a href={`${GITHUB_URL}#documentation`} target="_blank" rel="noopener noreferrer" style={{ background: "transparent", color: "#94A3B8", fontSize: 13, fontFamily: F, fontWeight: 500, padding: "6px 12px", borderRadius: 6, textDecoration: "none" }}>
+            Docs
+          </a>
+          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", color: "#94A3B8", fontSize: 13, fontFamily: F, fontWeight: 500, padding: "6px 12px", borderRadius: 6, textDecoration: "none" }}>
+            <FMIcon name="github" size={14} color="#94A3B8" />
+            GitHub
+          </a>
           <div style={{ width: 1, height: 18, background: "rgba(148,184,255,0.18)", margin: "0 8px" }} />
-          <Link href="/dashboard" style={{ background: "transparent", color: "#94A3B8", fontSize: 13, fontFamily: F, fontWeight: 500, padding: "6px 14px", borderRadius: 6, cursor: "pointer", textDecoration: "none" }}>
+          <Link href="/login" style={{ background: "transparent", color: "#94A3B8", fontSize: 13, fontFamily: F, fontWeight: 500, padding: "6px 14px", borderRadius: 6, textDecoration: "none" }}>
             Sign in
           </Link>
-          <Link href="/dashboard" style={{
-            display: "inline-flex", alignItems: "center",
+          <Link href="/demo" style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
             background: "linear-gradient(135deg, #00C8E0, #00E5FF)",
             color: "#05070C", fontSize: 12.5, fontFamily: F, fontWeight: 700,
-            padding: "7px 16px", borderRadius: 8, cursor: "pointer", textDecoration: "none",
+            padding: "7px 16px", borderRadius: 8, textDecoration: "none",
             boxShadow: "0 0 0 1px rgba(0,229,255,0.4), 0 4px 16px rgba(0,229,255,0.3)",
           }}>
-            Get started free
+            Try the demo
           </Link>
         </div>
       </nav>
@@ -146,7 +163,7 @@ export default function Home() {
           }}>
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#00E5FF", boxShadow: "0 0 6px #00E5FF" }} />
             <span style={{ fontFamily: FM, fontSize: 10.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#00E5FF" }}>
-              Now with live team collaboration
+              Now open source — AGPL-3.0
             </span>
             <span style={{ color: "#64748B", fontSize: 10 }}>→</span>
           </div>
@@ -160,32 +177,33 @@ export default function Home() {
             Trace every fiber.<br />Map every splice.
           </h1>
 
-          <p style={{ marginTop: 24, fontSize: 17.5, color: "#CBD5E1", lineHeight: 1.6, maxWidth: 580, margin: "24px auto 0", fontFamily: F }}>
-            Professional fiber-optic splice diagrams built for ISPs, TelCos, and network contractors. From trunk to subscriber — every strand accounted for.
+          <p style={{ marginTop: 24, fontSize: 17.5, color: "#CBD5E1", lineHeight: 1.6, maxWidth: 600, margin: "24px auto 0", fontFamily: F }}>
+            An open-source canvas editor for fiber-optic networks. Design splice diagrams, trace paths through your plant, and export production-ready documentation — for ISPs, contractors, educators, and tinkerers.
           </p>
 
           <div style={{ marginTop: 40, display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-            <Link href="/dashboard" style={{
+            <Link href="/demo" style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               background: "linear-gradient(135deg, #00C8E0, #00E5FF)",
               color: "#05070C", fontSize: 14, fontFamily: F, fontWeight: 700,
               height: 44, padding: "0 24px", borderRadius: 10, textDecoration: "none",
               boxShadow: "0 0 0 1px rgba(0,229,255,0.4), 0 6px 32px rgba(0,229,255,0.3)",
             }}>
-              Open Dashboard <FMIcon name="arrow" size={16} color="#05070C" />
+              <FMIcon name="play" size={14} color="#05070C" />
+              Try the live demo
             </Link>
-            <button style={{
+            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               background: "rgba(255,255,255,0.06)", border: "1px solid rgba(148,184,255,0.2)",
               color: "#F1F5F9", fontSize: 14, fontFamily: F, fontWeight: 600,
-              height: 44, padding: "0 24px", borderRadius: 10, cursor: "pointer",
+              height: 44, padding: "0 24px", borderRadius: 10, textDecoration: "none",
             }}>
-              <FMIcon name="play" size={14} color="#00E5FF" /> Watch 2-min demo
-            </button>
+              <FMIcon name="github" size={16} color="#F1F5F9" /> Star on GitHub
+            </a>
           </div>
 
           <div style={{ marginTop: 44, display: "flex", gap: 32, justifyContent: "center", flexWrap: "wrap" }}>
-            {["Free 14-day trial", "No credit card required", "Import from Visio / AutoCAD"].map((text, i) => (
+            {["No account needed to demo", "Self-hostable", "Your data stays yours"].map((text, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <div style={{ width: 16, height: 16, borderRadius: 999, background: "rgba(61,245,163,0.15)", border: "1px solid rgba(61,245,163,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <FMIcon name="check" size={9} color="#3DF5A3" strokeWidth={2.5} />
@@ -197,24 +215,24 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Stats strip */}
+      {/* Highlights strip */}
       <div style={{
         borderTop: "1px solid rgba(148,184,255,0.10)", borderBottom: "1px solid rgba(148,184,255,0.10)",
         background: "linear-gradient(90deg, rgba(0,229,255,0.04), rgba(61,245,163,0.03), rgba(79,70,229,0.04))",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: "0 40px",
       }}>
-        {STATS.map((s, i) => (
+        {HIGHLIGHTS.map((s, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 52px", gap: 4 }}>
-              <div style={{ fontFamily: F, fontSize: 32, fontWeight: 700, letterSpacing: "-0.03em", background: "linear-gradient(135deg, #F1F5F9, #00E5FF)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 44px", gap: 4 }}>
+              <div style={{ fontFamily: F, fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", background: "linear-gradient(135deg, #F1F5F9, #00E5FF)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
                 {s.val}
               </div>
               <div style={{ fontFamily: FM, fontSize: 10, letterSpacing: "0.16em", color: "#64748B", textTransform: "uppercase" }}>
                 {s.label}
               </div>
             </div>
-            {i < STATS.length - 1 && <div style={{ width: 1, height: 36, background: "rgba(148,184,255,0.12)" }} />}
+            {i < HIGHLIGHTS.length - 1 && <div style={{ width: 1, height: 36, background: "rgba(148,184,255,0.12)" }} />}
           </div>
         ))}
       </div>
@@ -222,11 +240,11 @@ export default function Home() {
       {/* Features grid */}
       <div style={{ padding: "56px 48px 64px", background: "linear-gradient(180deg, #05070C, #070B14)" }}>
         <div style={{ textAlign: "center", marginBottom: 44 }}>
-          <div style={{ fontFamily: FM, fontSize: 10, letterSpacing: "0.22em", color: "#00E5FF", marginBottom: 10, textTransform: "uppercase" }}>Why SpliceForge</div>
+          <div style={{ fontFamily: FM, fontSize: 10, letterSpacing: "0.22em", color: "#00E5FF", marginBottom: 10, textTransform: "uppercase" }}>What it does</div>
           <h2 style={{ fontFamily: F, fontSize: "clamp(28px, 4vw, 38px)", fontWeight: 700, letterSpacing: "-0.025em", color: "#F1F5F9", lineHeight: 1.1, margin: 0 }}>
             Built for the field.<br />
             <span style={{ background: "linear-gradient(90deg, #00E5FF, #3DF5A3)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
-              Trusted in the NOC.
+              Yours to modify.
             </span>
           </h2>
         </div>
@@ -257,21 +275,33 @@ export default function Home() {
 
         {/* Bottom CTA */}
         <div style={{ textAlign: "center", marginTop: 56, paddingTop: 44, borderTop: "1px solid rgba(148,184,255,0.08)" }}>
-          <p style={{ fontSize: 14, color: "#64748B", marginBottom: 18, fontFamily: F }}>Trusted by network engineers at</p>
-          <div style={{ display: "flex", gap: 32, justifyContent: "center", alignItems: "center", flexWrap: "wrap", marginBottom: 36 }}>
-            {["Verizon Fiber", "Hyperoptic", "Ting Internet", "iX Systems", "Orange BE", "Gigaclear"].map((l) => (
-              <div key={l} style={{ fontFamily: F, fontSize: 14, fontWeight: 600, color: "#3B4A66", letterSpacing: "-0.01em" }}>{l}</div>
-            ))}
+          <h3 style={{ fontFamily: F, fontSize: 22, fontWeight: 700, color: "#F1F5F9", margin: "0 0 10px", letterSpacing: "-0.02em" }}>
+            Open source, made for the community.
+          </h3>
+          <p style={{ fontSize: 14, color: "#94A3B8", marginBottom: 22, fontFamily: F, maxWidth: 540, margin: "0 auto 22px", lineHeight: 1.6 }}>
+            Released under AGPL-3.0. Use it, fork it, deploy it on your own infrastructure. Contributions, bug reports, and translations welcome.
+          </p>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+            <Link href="/demo" style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              background: "linear-gradient(135deg, #00C8E0, #00E5FF)",
+              color: "#05070C", fontSize: 14, fontFamily: F, fontWeight: 700,
+              height: 44, padding: "0 28px", borderRadius: 10, textDecoration: "none",
+              boxShadow: "0 0 0 1px rgba(0,229,255,0.4), 0 8px 40px rgba(0,229,255,0.25)",
+            }}>
+              <FMIcon name="play" size={14} color="#05070C" />
+              Open the demo
+            </Link>
+            <a href={`${GITHUB_URL}/blob/main/CONTRIBUTING.md`} target="_blank" rel="noopener noreferrer" style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(148,184,255,0.2)",
+              color: "#F1F5F9", fontSize: 14, fontFamily: F, fontWeight: 600,
+              height: 44, padding: "0 24px", borderRadius: 10, textDecoration: "none",
+            }}>
+              <FMIcon name="heart" size={14} color="#F87171" />
+              Contribute
+            </a>
           </div>
-          <Link href="/dashboard" style={{
-            display: "inline-flex", alignItems: "center", gap: 8,
-            background: "linear-gradient(135deg, #00C8E0, #00E5FF)",
-            color: "#05070C", fontSize: 14, fontFamily: F, fontWeight: 700,
-            height: 44, padding: "0 32px", borderRadius: 10, textDecoration: "none",
-            boxShadow: "0 0 0 1px rgba(0,229,255,0.4), 0 8px 40px rgba(0,229,255,0.25)",
-          }}>
-            Start mapping for free <FMIcon name="arrow" size={16} color="#05070C" />
-          </Link>
         </div>
       </div>
     </div>

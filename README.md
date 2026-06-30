@@ -1,6 +1,11 @@
 # SpliceForge
 
-A fiber optic network mapping and visualization application built with Next.js. SpliceForge provides an interactive canvas editor for designing, documenting, and tracing fiber optic infrastructure — cables, splitters, equipment, closures, and their interconnections.
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+An **open-source** canvas editor for fiber-optic networks. SpliceForge provides an interactive editor for designing, documenting, and tracing fiber-optic infrastructure — cables, splitters, equipment, closures, and their interconnections. Built for ISPs, network contractors, educators, and self-hosters.
+
+**Try it now without an account:** [open the live demo →](http://localhost:7000/demo) (or visit `/demo` on your deployment)
 
 ## Documentation
 
@@ -11,6 +16,8 @@ A fiber optic network mapping and visualization application built with Next.js. 
 | [Architecture](docs/architecture.md) | Technical architecture for developers |
 | [Data Model](docs/data-model.md) | TypeScript types and database schema explained |
 | [Fiber Color Standards](docs/fiber-standards.md) | EIA-598, ABNT, and other supported color standards |
+| [Contributing](CONTRIBUTING.md) | How to set up locally and submit changes |
+| [Roadmap](ROADMAP.md) | What's in flight and where help is wanted |
 
 ---
 
@@ -60,7 +67,7 @@ A fiber optic network mapping and visualization application built with Next.js. 
 1. **Clone the repository**
 
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/wascal191/SpliceForge.git
    cd SpliceForge
    ```
 
@@ -85,13 +92,15 @@ A fiber optic network mapping and visualization application built with Next.js. 
 
    > ⚠️  `SUPABASE_SERVICE_ROLE_KEY` bypasses Row-Level Security and **must never be committed or shipped to the browser**. The supplied `.gitignore` excludes all `.env*` files; verify it has not been previously committed before publishing the repo.
 
+   > **Local dev tip:** to skip email confirmation during signup, set `enable_confirmations = false` in your `supabase/config.toml`. You can also try the app with no setup at all by visiting `/demo` after `npm run dev`.
+
 4. **Run the development server**
 
    ```bash
    npm run dev
    ```
 
-   Open [http://localhost:7000](http://localhost:7000) in your browser.
+   Open [http://localhost:7000](http://localhost:7000) in your browser, or jump straight to [http://localhost:7000/demo](http://localhost:7000/demo) to explore the canvas without signing up.
 
 ## Environment Variables
 
@@ -234,7 +243,6 @@ access to another tenant's data. Save the script below as
 create table if not exists organizations (
   id           uuid primary key default gen_random_uuid(),
   name         text not null,
-  plan         text,
   api_base_url text,
   created_at   timestamptz not null default now()
 );
@@ -530,3 +538,17 @@ npm start
 ```
 
 The production server also runs on port 7000. To change the port, edit the `dev` and `start` scripts in `package.json`.
+
+---
+
+## Contributing
+
+Contributions are welcome — bug reports, docs, translations, features, code review, everything. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup and conventions, and check the [roadmap](ROADMAP.md) for items where help is wanted.
+
+By contributing, you agree to license your work under the project's AGPL-3.0 license. You retain copyright on your contributions.
+
+## License
+
+SpliceForge is released under the **GNU Affero General Public License v3.0**. See [LICENSE](LICENSE) for the full text.
+
+The AGPL requires that anyone who runs a modified version of SpliceForge as a network service must publish the modified source code to its users. If you self-host an unmodified copy for your own organization, no extra obligations apply.

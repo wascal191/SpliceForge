@@ -47,7 +47,7 @@ export default async function DashboardPage() {
       totalCables={stats.totalCables}
       userEmail={user?.email ?? null}
       userName={(user?.user_metadata?.full_name as string | undefined) ?? null}
-      organization={org ? { id: org.id, name: org.name, plan: org.plan ?? "free" } : null}
+      organization={org ? { id: org.id, name: org.name } : null}
       currentUserRole={role}
     />
   );

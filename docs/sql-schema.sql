@@ -25,7 +25,6 @@
 CREATE TABLE IF NOT EXISTS organizations (
   id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   name            TEXT        NOT NULL,
-  plan            TEXT        NOT NULL DEFAULT 'trial',  -- 'trial' | 'pro' | 'enterprise'
   api_base_url    TEXT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -34,15 +34,12 @@
       "fullNamePlaceholder": "John Doe",
       "email": "Work email",
       "emailPlaceholder": "you@company.com",
-      "orgName": "Organization name",
-      "orgNamePlaceholder": "Acme Telecom",
-      "phone": "Phone number",
-      "phonePlaceholder": "+1 (555) 000-0000",
+      "orgName": "Organization name (optional)",
+      "orgNamePlaceholder": "Leave blank for a personal workspace",
       "password": "Password",
       "passwordPlaceholder": "Min. 8 characters",
       "submit": "Create account",
       "submitting": "Creating account…",
-      "testModeNotice": "Test mode · up to 5 users per organization · free",
       "haveAccount": "Already have an account?",
       "signIn": "Sign in",
       "checkEmailTitle": "Check your email",
@@ -50,8 +47,7 @@
       "alreadyConfirmed": "Already confirmed?",
       "validation": {
         "nameTooLong": "Full name is too long or empty",
-        "orgTooLong": "Organization name is too long or empty",
-        "invalidPhone": "Invalid phone number",
+        "orgTooLong": "Organization name is too long",
         "passwordTooShort": "Password must be at least 8 characters",
         "signupFailed": "Signup failed"
       }
@@ -172,7 +168,6 @@
       "roleOwner": "OWNER",
       "roleEditor": "EDITOR",
       "roleViewer": "VIEWER",
-      "plan": "Plan",
       "noOrganization": "No organization",
       "signOut": "Sign out"
     },

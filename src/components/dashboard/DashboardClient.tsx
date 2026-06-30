@@ -230,7 +230,7 @@ function UserMenu({
 }: {
   userEmail: string | null;
   userName: string | null;
-  organization: { id: string; name: string; plan: string } | null;
+  organization: { id: string; name: string } | null;
 }) {
   const t = useTranslations("dashboard.team");
   const router = useRouter();
@@ -305,20 +305,6 @@ function UserMenu({
                 </div>
               </div>
             </div>
-            {organization && (
-              <div style={{
-                background: "rgba(0,229,255,0.06)", border: "1px solid rgba(0,229,255,0.14)",
-                borderRadius: 6, padding: "5px 9px",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-              }}>
-                <span style={{ fontFamily: FM, fontSize: 9, letterSpacing: "0.08em", color: "#64748B", textTransform: "uppercase" }}>
-                  {t("plan")}
-                </span>
-                <span style={{ fontFamily: FM, fontSize: 9.5, color: "#00E5FF", letterSpacing: "0.06em", fontWeight: 600 }}>
-                  {(organization.plan ?? "free").toUpperCase()}
-                </span>
-              </div>
-            )}
           </div>
 
           <LocaleSwitcher />
@@ -367,7 +353,7 @@ export function DashboardClient({
   totalCables: number;
   userEmail: string | null;
   userName: string | null;
-  organization: { id: string; name: string; plan: string } | null;
+  organization: { id: string; name: string } | null;
   currentUserRole: string | null;
 }) {
   const router = useRouter();

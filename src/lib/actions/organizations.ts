@@ -22,7 +22,6 @@ import { env, MAX_MEMBERS_PER_ORG } from "@/env";
 export type Organization = {
   id: string;
   name: string;
-  plan?: string | null;
   api_base_url?: string | null;
   created_at: string;
 };
@@ -176,7 +175,7 @@ export async function inviteMember(
 
   if ((count ?? 0) >= MAX_MEMBERS_PER_ORG) {
     throw new Error(
-      `Maximum ${MAX_MEMBERS_PER_ORG} users per organization on this plan`
+      `Maximum ${MAX_MEMBERS_PER_ORG} members per organization (configurable via MAX_MEMBERS_PER_ORG)`
     );
   }
 
