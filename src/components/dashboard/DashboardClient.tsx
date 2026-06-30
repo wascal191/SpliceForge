@@ -19,7 +19,7 @@ type InviteUI = {
   expires_at: string;
   token?: string;
 };
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -249,8 +249,7 @@ function UserMenu({
   }, [open]);
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await authClient.signOut();
     router.push("/login");
     router.refresh();
   }

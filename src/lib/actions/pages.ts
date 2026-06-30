@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { maybeOne, rows, query, withTransaction } from "@/lib/db";
 import { requireAuthContext, assertOrgOwnsRow, assertOrgOwnsRows } from "@/lib/guards";
 import {
   PageDataJson,
@@ -12,6 +12,16 @@ import {
 } from "@/lib/validation";
 import { fail } from "@/lib/errors";
 
+export type Page = {
+  id: string;
+  organization_id: string;
+  bedsheet_id: string;
+  page_index: number;
+  title: string | null;
+  data_json: Record<string, unknown> | null;
+  created_at: string;
+};
+
 export async function createPage(bedsheetId: string, pageIndex: number, title?: string) {
   const cleanId = parseOrFail(Uuid, bedsheetId, "createPage.bedsheetId");
   const cleanIndex = parseOrFail(z.number().int().min(0).max(10_000), pageIndex, "createPage.index");
@@ -20,63 +30,63 @@ export async function createPage(bedsheetId: string, pageIndex: number, title?: 
   const ctx = await requireAuthContext();
   await assertOrgOwnsRow("bedsheets", cleanId, ctx.orgId);
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("pages")
-    .insert({
-      bedsheet_id: cleanId,
-      page_index: cleanIndex,
-      title: cleanTitle,
-      organization_id: ctx.orgId,
-    })
-    .select()
-    .single();
-  if (error) fail("pages.createPage", error, "Could not create page");
-  revalidatePath("/canvas", "layout");
-  return data;
+  try {
+    const data = await maybeOne<Page>(
+      `INSERT INTO pages (bedsheet_id, page_index, title, organization_id)
+         VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [cleanId, cleanIndex, cleanTitle, ctx.orgId]
+    );
+    if (!data) fail("pages.createPage", new Error("no row"), "Could not create page");
+    revalidatePath("/canvas", "layout");
+    return data!;
+  } catch (e) {
+    fail("pages.createPage", e, "Could not create page");
+  }
 }
 
 export async function getPages(bedsheetId: string) {
   const cleanId = parseOrFail(Uuid, bedsheetId, "getPages.bedsheetId");
   const ctx = await requireAuthContext();
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("pages")
-    .select("*")
-    .eq("bedsheet_id", cleanId)
-    .eq("organization_id", ctx.orgId)
-    .order("page_index", { ascending: true });
-  if (error) fail("pages.getPages", error, "Could not load pages");
-  return data;
+  try {
+    return await rows<Page>(
+      `SELECT * FROM pages
+        WHERE bedsheet_id = $1 AND organization_id = $2
+        ORDER BY page_index ASC`,
+      [cleanId, ctx.orgId]
+    );
+  } catch (e) {
+    fail("pages.getPages", e, "Could not load pages");
+  }
 }
 
 export async function renamePage(pageId: string, title: string) {
   const cleanId = parseOrFail(Uuid, pageId, "renamePage.id");
   const cleanTitle = parseOrFail(PageTitle, title, "renamePage.title");
   const ctx = await requireAuthContext();
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("pages")
-    .update({ title: cleanTitle })
-    .eq("id", cleanId)
-    .eq("organization_id", ctx.orgId);
-  if (error) fail("pages.renamePage", error, "Could not rename page");
+  try {
+    await query(
+      `UPDATE pages SET title = $1
+        WHERE id = $2 AND organization_id = $3`,
+      [cleanTitle, cleanId, ctx.orgId]
+    );
+  } catch (e) {
+    fail("pages.renamePage", e, "Could not rename page");
+  }
   revalidatePath("/canvas", "layout");
 }
 
 export async function deletePage(pageId: string) {
   const cleanId = parseOrFail(Uuid, pageId, "deletePage.id");
   const ctx = await requireAuthContext();
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("pages")
-    .delete()
-    .eq("id", cleanId)
-    .eq("organization_id", ctx.orgId);
-  if (error) fail("pages.deletePage", error, "Could not delete page");
+  try {
+    await query(
+      `DELETE FROM pages WHERE id = $1 AND organization_id = $2`,
+      [cleanId, ctx.orgId]
+    );
+  } catch (e) {
+    fail("pages.deletePage", e, "Could not delete page");
+  }
   revalidatePath("/canvas", "layout");
 }
 
@@ -84,14 +94,15 @@ export async function updatePageData(pageId: string, dataJson: unknown) {
   const cleanId = parseOrFail(Uuid, pageId, "updatePageData.id");
   const parsed = parseOrFail(PageDataJson, dataJson, "updatePageData.dataJson");
   const ctx = await requireAuthContext();
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("pages")
-    .update({ data_json: parsed })
-    .eq("id", cleanId)
-    .eq("organization_id", ctx.orgId);
-  if (error) fail("pages.updatePageData", error, "Could not save page");
+  try {
+    await query(
+      `UPDATE pages SET data_json = $1
+        WHERE id = $2 AND organization_id = $3`,
+      [parsed, cleanId, ctx.orgId]
+    );
+  } catch (e) {
+    fail("pages.updatePageData", e, "Could not save page");
+  }
   revalidatePath("/canvas", "layout");
 }
 
@@ -105,16 +116,15 @@ export async function reorderPages(updates: unknown) {
   const ctx = await requireAuthContext();
   await assertOrgOwnsRows("pages", parsed.map((p) => p.id), ctx.orgId);
 
-  const supabase = await createClient();
-  await Promise.all(
-    parsed.map(({ id, page_index }) =>
-      supabase
-        .from("pages")
-        .update({ page_index })
-        .eq("id", id)
-        .eq("organization_id", ctx.orgId)
-    )
-  );
+  await withTransaction(async (tx) => {
+    for (const { id, page_index } of parsed) {
+      await tx.query(
+        `UPDATE pages SET page_index = $1
+          WHERE id = $2 AND organization_id = $3`,
+        [page_index, id, ctx.orgId]
+      );
+    }
+  });
   revalidatePath("/canvas", "layout");
 }
 
@@ -123,149 +133,119 @@ export async function duplicatePage(sourcePageId: string, bedsheetId: string) {
   const cleanBedsheet = parseOrFail(Uuid, bedsheetId, "duplicatePage.bedsheet");
 
   const ctx = await requireAuthContext();
-  // Both source page and target bedsheet must belong to the caller's org.
   await assertOrgOwnsRow("pages", cleanSource, ctx.orgId);
   await assertOrgOwnsRow("bedsheets", cleanBedsheet, ctx.orgId);
 
-  const supabase = await createClient();
   const orgId = ctx.orgId;
 
-  const [{ data: srcPage }, { count }] = await Promise.all([
-    supabase
-      .from("pages")
-      .select("*")
-      .eq("id", cleanSource)
-      .eq("organization_id", orgId)
-      .single(),
-    supabase
-      .from("pages")
-      .select("*", { count: "exact", head: true })
-      .eq("bedsheet_id", cleanBedsheet)
-      .eq("organization_id", orgId),
-  ]);
-  if (!srcPage) throw new Error("Source page not found");
+  return await withTransaction(async (tx) => {
+    const srcPageRes = await tx.query<Page>(
+      `SELECT * FROM pages WHERE id = $1 AND organization_id = $2`,
+      [cleanSource, orgId]
+    );
+    const srcPage = srcPageRes.rows[0];
+    if (!srcPage) throw new Error("Source page not found");
 
-  const newIndex = count ?? 0;
-  const srcTitle = srcPage.title ?? `Page ${srcPage.page_index + 1}`;
+    const countRes = await tx.query<{ c: string }>(
+      `SELECT COUNT(*)::TEXT AS c FROM pages
+        WHERE bedsheet_id = $1 AND organization_id = $2`,
+      [cleanBedsheet, orgId]
+    );
+    const newIndex = Number(countRes.rows[0]?.c ?? "0");
+    const srcTitle = srcPage.title ?? `Page ${srcPage.page_index + 1}`;
 
-  const { data: newPage, error: pageErr } = await supabase
-    .from("pages")
-    .insert({
-      bedsheet_id: cleanBedsheet,
-      page_index: newIndex,
-      title: `${srcTitle} (copy)`,
-      data_json: srcPage.data_json,
-      organization_id: orgId,
-    })
-    .select()
-    .single();
-  if (pageErr || !newPage) fail("pages.duplicatePage.insert", pageErr, "Could not duplicate page");
+    const newPageRes = await tx.query<Page>(
+      `INSERT INTO pages
+         (bedsheet_id, page_index, title, data_json, organization_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [cleanBedsheet, newIndex, `${srcTitle} (copy)`, srcPage.data_json, orgId]
+    );
+    const newPage = newPageRes.rows[0];
+    if (!newPage) throw new Error("Failed to create duplicate page");
 
-  const { data: elements } = await supabase
-    .from("elements")
-    .select("*")
-    .eq("page_id", cleanSource)
-    .eq("organization_id", orgId);
-  if (!elements || elements.length === 0) return newPage;
+    const elementsRes = await tx.query<{
+      id: string; type: string; label: string;
+      position_x: number; position_y: number;
+      config_json: Record<string, unknown> | null;
+    }>(
+      `SELECT id, type, label, position_x, position_y, config_json
+         FROM elements
+        WHERE page_id = $1 AND organization_id = $2`,
+      [cleanSource, orgId]
+    );
+    if (elementsRes.rows.length === 0) return newPage;
 
-  const elementIdMap: Record<string, string> = {};
-  for (const el of elements) {
-    const { data: newEl } = await supabase
-      .from("elements")
-      .insert({
-        page_id: newPage.id,
-        type: el.type,
-        label: el.label,
-        position_x: el.position_x,
-        position_y: el.position_y,
-        config_json: el.config_json,
-        organization_id: orgId,
-      })
-      .select("id")
-      .single();
-    if (newEl) elementIdMap[el.id] = newEl.id;
-  }
-
-  const elementIds = elements.map((e) => e.id);
-  const { data: ports } = await supabase
-    .from("ports")
-    .select("*")
-    .in("element_id", elementIds)
-    .eq("organization_id", orgId)
-    .order("port_index", { ascending: true });
-  if (!ports || ports.length === 0) return newPage;
-
-  const portIdMap: Record<string, string> = {};
-  for (const port of ports) {
-    const newElId = elementIdMap[port.element_id];
-    if (!newElId) continue;
-    const { data: newPort } = await supabase
-      .from("ports")
-      .insert({
-        element_id: newElId,
-        port_index: port.port_index,
-        fiber_count: port.fiber_count,
-        colors: port.colors,
-        status: "unoccupied",
-        organization_id: orgId,
-      })
-      .select("id")
-      .single();
-    if (newPort) portIdMap[port.id] = newPort.id;
-  }
-
-  const portIds = ports.map((p) => p.id);
-  if (portIds.length === 0) return newPage;
-
-  // Replace risky `.or("port_from.in.(${list})...")` interpolation with
-  // typed paired `.in()` queries unioned in memory (V-13).
-  const [r1, r2] = await Promise.all([
-    supabase
-      .from("splices")
-      .select("*")
-      .in("port_from", portIds)
-      .eq("organization_id", orgId),
-    supabase
-      .from("splices")
-      .select("*")
-      .in("port_to", portIds)
-      .eq("organization_id", orgId),
-  ]);
-  const seen = new Set<string>();
-  const splices: Array<{
-    id: string;
-    port_from: string;
-    port_to: string;
-    comment: string | null;
-    color: string | null;
-  }> = [];
-  for (const row of [...(r1.data ?? []), ...(r2.data ?? [])]) {
-    if (!seen.has(row.id)) {
-      seen.add(row.id);
-      splices.push(row);
+    const elementIdMap: Record<string, string> = {};
+    for (const el of elementsRes.rows) {
+      const r = await tx.query<{ id: string }>(
+        `INSERT INTO elements
+           (page_id, type, label, position_x, position_y, config_json, organization_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id`,
+        [newPage.id, el.type, el.label, el.position_x, el.position_y, el.config_json, orgId]
+      );
+      const newEl = r.rows[0];
+      if (newEl) elementIdMap[el.id] = newEl.id;
     }
-  }
 
-  if (splices.length > 0) {
-    for (const splice of splices) {
+    const elementIds = elementsRes.rows.map((e) => e.id);
+    const portsRes = await tx.query<{
+      id: string; element_id: string; port_index: number;
+      fiber_count: number; colors: string[];
+    }>(
+      `SELECT id, element_id, port_index, fiber_count, colors
+         FROM ports
+        WHERE element_id = ANY($1::uuid[]) AND organization_id = $2
+        ORDER BY port_index ASC`,
+      [elementIds, orgId]
+    );
+    if (portsRes.rows.length === 0) return newPage;
+
+    const portIdMap: Record<string, string> = {};
+    for (const port of portsRes.rows) {
+      const newElId = elementIdMap[port.element_id];
+      if (!newElId) continue;
+      const r = await tx.query<{ id: string }>(
+        `INSERT INTO ports
+           (element_id, port_index, fiber_count, colors, status, organization_id)
+         VALUES ($1, $2, $3, $4, 'unoccupied', $5)
+         RETURNING id`,
+        [newElId, port.port_index, port.fiber_count, port.colors, orgId]
+      );
+      const newPort = r.rows[0];
+      if (newPort) portIdMap[port.id] = newPort.id;
+    }
+
+    const portIds = portsRes.rows.map((p) => p.id);
+    const splicesRes = await tx.query<{
+      id: string; port_from: string; port_to: string;
+      comment: string | null; color: string | null;
+    }>(
+      `SELECT DISTINCT id, port_from, port_to, comment, color
+         FROM splices
+        WHERE (port_from = ANY($1::uuid[]) OR port_to = ANY($1::uuid[]))
+          AND organization_id = $2`,
+      [portIds, orgId]
+    );
+
+    for (const splice of splicesRes.rows) {
       const newFrom = portIdMap[splice.port_from];
       const newTo = portIdMap[splice.port_to];
       if (!newFrom || !newTo) continue;
-      await supabase.from("splices").insert({
-        port_from: newFrom,
-        port_to: newTo,
-        comment: splice.comment,
-        color: splice.color,
-        organization_id: orgId,
-      });
-      await supabase
-        .from("ports")
-        .update({ status: "occupied" })
-        .in("id", [newFrom, newTo])
-        .eq("organization_id", orgId);
+      await tx.query(
+        `INSERT INTO splices (port_from, port_to, comment, color, organization_id)
+           VALUES ($1, $2, $3, $4, $5)`,
+        [newFrom, newTo, splice.comment, splice.color, orgId]
+      );
+      await tx.query(
+        `UPDATE ports SET status = 'occupied'
+          WHERE id = ANY($1::uuid[]) AND organization_id = $2`,
+        [[newFrom, newTo], orgId]
+      );
     }
-  }
 
-  revalidatePath("/canvas", "layout");
-  return newPage;
+    revalidatePath("/canvas", "layout");
+    return newPage;
+  });
 }

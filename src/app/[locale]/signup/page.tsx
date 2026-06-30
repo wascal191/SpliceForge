@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import { createOrganization } from "@/lib/actions/organizations";
 
 const F = "var(--font-inter), sans-serif";
@@ -20,7 +20,6 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [checkEmail, setCheckEmail] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,64 +33,30 @@ export default function SignupPage() {
       if (trimmedOrg.length > 120) throw new Error(tv("orgTooLong"));
       if (password.length < 8) throw new Error(tv("passwordTooShort"));
 
-      // Stamp the current locale into the cookie next-intl reads, so the
-      // /auth/callback redirect after email confirmation lands on the right
-      // locale-prefixed page.
+      // Stamp the current locale so client-side navigations stay in the
+      // user's chosen locale.
       document.cookie = `NEXT_LOCALE=${locale}; Path=/; Max-Age=31536000; SameSite=Lax`;
 
-      const supabase = createClient();
-      const { data, error: authError } = await supabase.auth.signUp({
+      const result = await authClient.signUp.email({
         email,
         password,
-        options: {
-          data: {
-            full_name: trimmedName,
-            company_name: finalOrg,
-          },
-          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/callback`,
-        },
+        name: trimmedName,
       });
-      if (authError) throw authError;
-
-      if (data.session) {
-        await createOrganization(finalOrg);
-        router.push("/dashboard");
-        router.refresh();
-      } else {
-        setCheckEmail(true);
+      if (result.error) {
+        throw new Error(result.error.message ?? tv("signupFailed"));
       }
+
+      // autoSignIn:true in src/lib/auth.ts means we're now signed in. Provision
+      // the org. If verification is later enabled, this branch won't be hit
+      // and the user will land on a verification screen first.
+      await createOrganization(finalOrg);
+      router.push("/dashboard");
+      router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : tv("signupFailed"));
     } finally {
       setLoading(false);
     }
-  }
-
-  if (checkEmail) {
-    return (
-      <div style={{
-        minHeight: "100vh", background: "#05070C", display: "flex",
-        alignItems: "center", justifyContent: "center",
-      }}>
-        <div style={{
-          maxWidth: 400, width: "100%", padding: "0 24px", textAlign: "center",
-        }}>
-          <div style={{ fontSize: 40, marginBottom: 20 }}>📬</div>
-          <h2 style={{ fontFamily: F, fontSize: 22, fontWeight: 700, color: "#F1F5F9", margin: "0 0 12px", letterSpacing: "-0.02em" }}>
-            {t("checkEmailTitle")}
-          </h2>
-          <p style={{ fontFamily: F, fontSize: 13.5, color: "#64748B", lineHeight: 1.6, margin: 0 }}>
-            {t.rich("checkEmailBody", {
-              email: () => <span style={{ color: "#00E5FF" }}>{email}</span>,
-            })}
-          </p>
-          <div style={{ marginTop: 24, fontFamily: F, fontSize: 12.5, color: "#3B4A66" }}>
-            {t("alreadyConfirmed")}{" "}
-            <Link href="/login" style={{ color: "#00E5FF", textDecoration: "none" }}>{t("signIn")}</Link>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return (

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { maybeOne, rows, query } from "@/lib/db";
 import { requireAuthContext } from "@/lib/guards";
 import { LibraryCableInput, Uuid, parseOrFail } from "@/lib/validation";
 import { fail } from "@/lib/errors";
@@ -23,18 +23,18 @@ export async function getLibraryCables(): Promise<LibraryCable[]> {
     return [];
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("library_cables")
-    .select("*")
-    .eq("organization_id", ctx.orgId)
-    .order("created_at", { ascending: false });
-  if (error) {
-    // eslint-disable-next-line no-console
-    console.error("[library.getLibraryCables]", error);
+  try {
+    return await rows<LibraryCable>(
+      `SELECT id, name, fiber_count, color_scheme, module_fiber_count, created_at
+         FROM library_cables
+        WHERE organization_id = $1
+        ORDER BY created_at DESC`,
+      [ctx.orgId]
+    );
+  } catch (e) {
+    console.error("[library.getLibraryCables]", e);
     return [];
   }
-  return data;
 }
 
 export async function saveToLibrary(
@@ -50,33 +50,38 @@ export async function saveToLibrary(
   );
 
   const ctx = await requireAuthContext();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("library_cables")
-    .insert({
-      name: parsed.name,
-      fiber_count: parsed.fiberCount,
-      color_scheme: parsed.colorScheme,
-      module_fiber_count: parsed.moduleFiberCount ?? null,
-      organization_id: ctx.orgId,
-    })
-    .select()
-    .single();
-  if (error) fail("library.saveToLibrary", error, "Could not save to library");
-  revalidatePath("/canvas", "layout");
-  return data;
+  try {
+    const data = await maybeOne<LibraryCable>(
+      `INSERT INTO library_cables
+         (name, fiber_count, color_scheme, module_fiber_count, organization_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, fiber_count, color_scheme, module_fiber_count, created_at`,
+      [
+        parsed.name,
+        parsed.fiberCount,
+        parsed.colorScheme,
+        parsed.moduleFiberCount ?? null,
+        ctx.orgId,
+      ]
+    );
+    if (!data) fail("library.saveToLibrary", new Error("no row"), "Could not save to library");
+    revalidatePath("/canvas", "layout");
+    return data!;
+  } catch (e) {
+    fail("library.saveToLibrary", e, "Could not save to library");
+  }
 }
 
 export async function deleteLibraryCable(id: string) {
   const cleanId = parseOrFail(Uuid, id, "deleteLibraryCable.id");
   const ctx = await requireAuthContext();
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("library_cables")
-    .delete()
-    .eq("id", cleanId)
-    .eq("organization_id", ctx.orgId);
-  if (error) fail("library.deleteLibraryCable", error, "Could not delete library cable");
+  try {
+    await query(
+      `DELETE FROM library_cables WHERE id = $1 AND organization_id = $2`,
+      [cleanId, ctx.orgId]
+    );
+  } catch (e) {
+    fail("library.deleteLibraryCable", e, "Could not delete library cable");
+  }
   revalidatePath("/canvas", "layout");
 }

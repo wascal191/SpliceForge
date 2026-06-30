@@ -17,12 +17,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # Placeholder values just to satisfy src/env.ts at build/test time.
-      # Production values are configured in Vercel; these never reach prod.
-      NEXT_PUBLIC_SUPABASE_URL: https://stub.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: stub-anon-key-stub-anon-key
+      # Stubs to satisfy src/env.ts during typecheck/build. Real production
+      # values are configured in the deployment environment.
+      DATABASE_URL: postgres://stub:stub@localhost:5432/stub
+      BETTER_AUTH_SECRET: ci-stub-secret-at-least-32-characters-long
       NEXT_PUBLIC_SITE_URL: https://stub.example.com
-      SUPABASE_SERVICE_ROLE_KEY: stub-service-role-key-stub-service-role-key
       MAX_MEMBERS_PER_ORG: "5"
     steps:
       - uses: actions/checkout@v4

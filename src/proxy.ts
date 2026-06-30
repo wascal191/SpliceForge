@@ -1,9 +1,8 @@
 // Renamed from `middleware.ts` for Next.js 16 (V-11).
-// Composes next-intl locale routing with the existing Supabase auth gate.
+// Composes next-intl locale routing with the Better Auth session gate.
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import createIntlMiddleware from "next-intl/middleware";
-import { env } from "@/env";
+import { auth } from "@/lib/auth";
 import { routing } from "@/i18n/routing";
 
 const intlMiddleware = createIntlMiddleware(routing);
@@ -12,10 +11,10 @@ const LOCALE_RE = /^\/(en|es|pt-br)(?=\/|$)/;
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 1. Unprefixed routes: Supabase OAuth callback + any future API routes
-  //    bypass both intl and auth. Supabase posts here with the exact path
-  //    `/auth/callback?code=...` and must not be locale-rewritten.
-  if (pathname.startsWith("/auth/callback") || pathname.startsWith("/api/")) {
+  // 1. Better Auth API routes and any future unprefixed `/api/*` bypass both
+  //    intl and the auth gate. The Better Auth catch-all lives at
+  //    `/api/auth/[...all]/route.ts` and must not be locale-rewritten.
+  if (pathname.startsWith("/api/")) {
     return NextResponse.next({ request });
   }
 
@@ -23,7 +22,6 @@ export async function proxy(request: NextRequest) {
   //    `/{defaultLocale}/...` when the user lands on an unprefixed path.
   const intlResponse = intlMiddleware(request);
   if (intlResponse.headers.get("location")) {
-    // Intl is issuing a redirect — let it through unmodified.
     return intlResponse;
   }
 
@@ -32,52 +30,27 @@ export async function proxy(request: NextRequest) {
   const locale = match ? match[1] : routing.defaultLocale;
   const stripped = pathname.replace(LOCALE_RE, "") || "/";
 
-  // 4. Existing Supabase auth gate. Build response that preserves any
-  //    cookies next-intl wrote on its pass-through response.
-  let response = intlResponse;
-  const supabase = createServerClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 4. Better Auth session lookup. The cookie is read out of request headers.
+  const session = await auth.api.getSession({ headers: request.headers });
 
   const isProtected =
     stripped.startsWith("/dashboard") || stripped.startsWith("/canvas");
   const isAuthPage =
-    stripped.startsWith("/login") ||
-    stripped.startsWith("/signup") ||
-    (stripped.startsWith("/auth") && !stripped.startsWith("/auth/setup"));
+    stripped.startsWith("/login") || stripped.startsWith("/signup");
 
-  if (isProtected && !user) {
+  if (isProtected && !session?.user) {
     const url = request.nextUrl.clone();
     url.pathname = `/${locale}/login`;
     return NextResponse.redirect(url);
   }
 
-  if (isAuthPage && user) {
+  if (isAuthPage && session?.user) {
     const url = request.nextUrl.clone();
     url.pathname = `/${locale}/dashboard`;
     return NextResponse.redirect(url);
   }
 
-  return response;
+  return intlResponse;
 }
 
 export const config = {

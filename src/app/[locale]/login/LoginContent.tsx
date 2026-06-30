@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import { safeNext } from "@/lib/redirects";
 
 const F = "var(--font-inter), sans-serif";
@@ -42,14 +42,10 @@ export default function LoginContent() {
     setError(null);
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (authError) throw authError;
-      if (!data.session) throw new Error("invalid_credentials");
-
+      const result = await authClient.signIn.email({ email, password });
+      if (result.error) {
+        throw new Error(result.error.message ?? "invalid_credentials");
+      }
       router.push(safeNext(searchParams.get("next")));
       router.refresh();
     } catch (err: unknown) {

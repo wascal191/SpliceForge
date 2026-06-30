@@ -1,33 +1,23 @@
 /**
  * Single source of truth for all environment variables.
  *
- * Throws at module load if a required var is missing, so a misconfigured
- * deploy fails fast at boot instead of with a cryptic runtime crash on the
- * first request (avoids the ERROR 3803919807 class of issue described in
- * the deployment notes).
+ * Server-side env vars are validated lazily (on first `serverEnv()` call) so
+ * that Next.js can collect page data and build static assets without needing
+ * a real DATABASE_URL or BETTER_AUTH_SECRET at compile time.
  *
- * Server-only secrets live under `serverOnly` and MUST NOT be imported into
- * client components — Next.js will reject `NEXT_PUBLIC_*`-less imports in
- * client bundles via its module-graph analysis, but we still gate access
- * through a typed accessor for clarity.
+ * Server-only secrets MUST NOT be imported into client components.
  */
 import { z } from "zod";
 
 const publicSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20),
-  // Optional in dev; required for production correctness (invite redirects,
-  // server-action allowlist). We don't .url() it because Vercel sometimes
-  // provides bare hostnames during preview deploys.
   NEXT_PUBLIC_SITE_URL: z.string().min(1).optional(),
 });
 
 const serverSchema = z.object({
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
-  // Optional — when both are present the rate limiter switches to Upstash.
+  DATABASE_URL: z.string().min(1),
+  BETTER_AUTH_SECRET: z.string().min(16),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
-  // Test-tier cap; configurable per environment.
   MAX_MEMBERS_PER_ORG: z
     .string()
     .optional()
@@ -43,8 +33,6 @@ const serverSchema = z.object({
 });
 
 const publicParsed = publicSchema.safeParse({
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
 });
 if (!publicParsed.success) {
@@ -54,13 +42,25 @@ if (!publicParsed.success) {
   throw new Error(`Invalid public env vars — ${issues}`);
 }
 
-// Server vars are only validated server-side. Doing it unconditionally would
-// throw in client bundles because secrets aren't shipped to the browser.
 const isServer = typeof window === "undefined";
-let serverParsed: z.infer<typeof serverSchema> | null = null;
-if (isServer) {
+let serverCache: z.infer<typeof serverSchema> | null = null;
+
+// Detect Next.js build phase so we can supply harmless placeholders during
+// `next build`'s page-data collection (real values are required at runtime).
+const isBuildPhase =
+  process.env.NEXT_PHASE === "phase-production-build" ||
+  process.env.NEXT_PHASE === "phase-export";
+
+function parseServerEnv(): z.infer<typeof serverSchema> {
   const r = serverSchema.safeParse({
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    DATABASE_URL:
+      process.env.DATABASE_URL ??
+      (isBuildPhase ? "postgres://build:build@localhost:5432/build" : undefined),
+    BETTER_AUTH_SECRET:
+      process.env.BETTER_AUTH_SECRET ??
+      (process.env.NODE_ENV === "production" && !isBuildPhase
+        ? undefined
+        : "dev-only-insecure-secret-please-change-32chars"),
     UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
     UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
     MAX_MEMBERS_PER_ORG: process.env.MAX_MEMBERS_PER_ORG,
@@ -71,22 +71,25 @@ if (isServer) {
       .join("; ");
     throw new Error(`Invalid server env vars — ${issues}`);
   }
-  serverParsed = r.data;
+  return r.data;
 }
 
 export const env = {
-  NEXT_PUBLIC_SUPABASE_URL: publicParsed.data.NEXT_PUBLIC_SUPABASE_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: publicParsed.data.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   NEXT_PUBLIC_SITE_URL: publicParsed.data.NEXT_PUBLIC_SITE_URL,
 } as const;
 
 export function serverEnv(): z.infer<typeof serverSchema> {
-  if (!serverParsed) {
+  if (!isServer) {
     throw new Error("serverEnv() must only be called on the server");
   }
-  return serverParsed;
+  if (!serverCache) {
+    serverCache = parseServerEnv();
+  }
+  return serverCache;
 }
 
-export const MAX_MEMBERS_PER_ORG = isServer
-  ? serverParsed!.MAX_MEMBERS_PER_ORG
-  : 5;
+/** Lazy accessor for the per-org member cap. Reads env on first call. */
+export function maxMembersPerOrg(): number {
+  if (!isServer) return 5;
+  return serverEnv().MAX_MEMBERS_PER_ORG;
+}

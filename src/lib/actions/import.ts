@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { query } from "@/lib/db";
 import { requireAuthContext, requireRole, assertOrgOwnsRow } from "@/lib/guards";
 import { parseOrFail } from "@/lib/validation";
 import { fail } from "@/lib/errors";
@@ -13,12 +13,7 @@ import {
   type BulkImportResult,
 } from "@/lib/import/types";
 
-// Pre-compute the color array per element so the RPC doesn't need to know
-// about color schemes. Ports are addressed by index, so the array's
-// position == the port_index it'll be inserted with.
-function portColorsFor(
-  el: BulkImportInput["elements"][number]
-): string[] {
+function portColorsFor(el: BulkImportInput["elements"][number]): string[] {
   const scheme: FiberColorScheme =
     el.type === "cable" ? (el.config.colorScheme as FiberColorScheme) : "EIA598";
   const count = portCountForElement(el);
@@ -40,8 +35,6 @@ export async function bulkImport(input: BulkImportInput): Promise<BulkImportResu
   requireRole(ctx, ["owner", "editor"]);
   await assertOrgOwnsRow("pages", parsed.pageId, ctx.orgId);
 
-  // Annotate each element with its precomputed port colors so the RPC can
-  // INSERT them in a single generate_series call.
   const elementsForRpc = parsed.elements.map((el) => ({
     key: el.key,
     type: el.type,
@@ -58,25 +51,24 @@ export async function bulkImport(input: BulkImportInput): Promise<BulkImportResu
     splices: parsed.splices,
   };
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("import_bundle", {
-    p_page_id: parsed.pageId,
-    p_payload: payload,
-  });
+  try {
+    const res = await query<{ import_bundle: RpcResult }>(
+      `SELECT import_bundle($1, $2::jsonb, $3) AS import_bundle`,
+      [parsed.pageId, JSON.stringify(payload), ctx.userId]
+    );
+    const data = res.rows[0]?.import_bundle;
+    if (!data) fail("import.bulkImport", new Error("no result"), "Could not import");
 
-  if (error) {
-    fail("import.bulkImport", error, "Could not import");
+    revalidatePath("/canvas", "layout");
+
+    return {
+      elementIds: data.elementIds,
+      ports: data.ports,
+      spliceIds: data.spliceIds,
+      elementCount: data.elementCount,
+      spliceCount: data.spliceCount,
+    };
+  } catch (e) {
+    fail("import.bulkImport", e, "Could not import");
   }
-
-  const result = data as RpcResult;
-
-  revalidatePath("/canvas", "layout");
-
-  return {
-    elementIds: result.elementIds,
-    ports: result.ports,
-    spliceIds: result.spliceIds,
-    elementCount: result.elementCount,
-    spliceCount: result.spliceCount,
-  };
 }

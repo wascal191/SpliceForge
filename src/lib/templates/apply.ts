@@ -1,7 +1,7 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { getFiberName } from "@/lib/fiber/colors";
 import { getTemplate, type Template } from "./index";
 import { portsForElement } from "./types";
+import { pool } from "@/lib/db";
 
 export type AppliedTemplate = {
   bedsheetId: string;
@@ -10,13 +10,27 @@ export type AppliedTemplate = {
   spliceCount: number;
 };
 
-// Seeds a bedsheet + first page + elements + ports + splices for the given
-// template into an existing project. Works with either the admin client
-// (used at signup) or the SSR client (used by the wizard) — caller is
-// responsible for auth + org ownership. Skips revalidatePath; callers
-// should refresh the routes they care about.
+/**
+ * The shape accepted by applyTemplate is a tiny subset of pg's PoolClient
+ * (just `query`) so callers can pass either a transactional client (preferred)
+ * or the pool directly. Both pg.Pool and pg.PoolClient satisfy this shape at
+ * runtime; the explicit interface avoids overload-inference issues in TS.
+ */
+export interface PgRunner {
+  query<R extends Record<string, unknown> = Record<string, unknown>>(
+    text: string,
+    params?: readonly unknown[]
+  ): Promise<{ rows: R[] }>;
+}
+
+/**
+ * Seeds a bedsheet + first page + elements + ports + splices for the given
+ * template into an existing project. Caller is responsible for auth + org
+ * ownership. Skips revalidatePath; callers should refresh the routes they
+ * care about.
+ */
 export async function applyTemplate(
-  supabase: SupabaseClient,
+  runner: PgRunner,
   orgId: string,
   projectId: string,
   templateOrId: string | Template,
@@ -26,84 +40,58 @@ export async function applyTemplate(
     typeof templateOrId === "string" ? getTemplate(templateOrId) : templateOrId;
   if (!template) throw new Error(`Unknown template: ${templateOrId}`);
 
-  const { data: bs, error: bsErr } = await supabase
-    .from("bedsheets")
-    .insert({
-      project_id: projectId,
-      organization_id: orgId,
-      name: bedsheetName ?? template.defaultBedsheetName,
-    })
-    .select("id")
-    .single();
-  if (bsErr || !bs) throw new Error(`applyTemplate.bedsheet: ${bsErr?.message ?? "insert failed"}`);
+  const bsRes = await runner.query<{ id: string }>(
+    `INSERT INTO bedsheets (project_id, organization_id, name)
+       VALUES ($1, $2, $3)
+     RETURNING id`,
+    [projectId, orgId, bedsheetName ?? template.defaultBedsheetName]
+  );
+  const bsId = bsRes.rows[0]?.id;
+  if (!bsId) throw new Error("applyTemplate.bedsheet: insert failed");
 
-  const { data: page, error: pageErr } = await supabase
-    .from("pages")
-    .insert({
-      bedsheet_id: bs.id,
-      organization_id: orgId,
-      page_index: 0,
-      title: "Page 1",
-    })
-    .select("id")
-    .single();
-  if (pageErr || !page) throw new Error(`applyTemplate.page: ${pageErr?.message ?? "insert failed"}`);
+  const pageRes = await runner.query<{ id: string }>(
+    `INSERT INTO pages (bedsheet_id, organization_id, page_index, title)
+       VALUES ($1, $2, 0, 'Page 1')
+     RETURNING id`,
+    [bsId, orgId]
+  );
+  const pageId = pageRes.rows[0]?.id;
+  if (!pageId) throw new Error("applyTemplate.page: insert failed");
 
   const keyToElementId: Record<string, string> = {};
-  // (elementKey, portIndex) -> port row id
   const portIdByKey: Record<string, Record<number, string>> = {};
 
   for (const el of template.elements) {
-    const { data: elementRow, error: elErr } = await supabase
-      .from("elements")
-      .insert({
-        page_id: page.id,
-        organization_id: orgId,
-        type: el.type,
-        label: el.label,
-        position_x: el.positionX,
-        position_y: el.positionY,
-        config_json: el.config,
-      })
-      .select("id")
-      .single();
-    if (elErr || !elementRow) {
-      throw new Error(`applyTemplate.element[${el.key}]: ${elErr?.message ?? "insert failed"}`);
-    }
-    keyToElementId[el.key] = elementRow.id;
+    const elRes = await runner.query<{ id: string }>(
+      `INSERT INTO elements
+         (page_id, organization_id, type, label, position_x, position_y, config_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id`,
+      [pageId, orgId, el.type, el.label, el.positionX, el.positionY, el.config]
+    );
+    const elementId = elRes.rows[0]?.id;
+    if (!elementId) throw new Error(`applyTemplate.element[${el.key}]: insert failed`);
+    keyToElementId[el.key] = elementId;
 
     const portCount = portsForElement(el);
     const colorScheme =
       el.type === "cable" ? (el.config.colorScheme as "EIA598") : "EIA598";
 
-    const portRows = Array.from({ length: portCount }, (_, i) => ({
-      element_id: elementRow.id,
-      organization_id: orgId,
-      port_index: i,
-      fiber_count: 1,
-      colors: [getFiberName(i, colorScheme)],
-      status: "unoccupied" as const,
-    }));
-    const { data: ports, error: portsErr } = await supabase
-      .from("ports")
-      .insert(portRows)
-      .select("id, port_index")
-      .order("port_index", { ascending: true });
-    if (portsErr || !ports) {
-      throw new Error(`applyTemplate.ports[${el.key}]: ${portsErr?.message ?? "insert failed"}`);
-    }
-
     const portMap: Record<number, string> = {};
-    for (const p of ports) portMap[p.port_index as number] = p.id as string;
+    for (let i = 0; i < portCount; i++) {
+      const r = await runner.query<{ id: string }>(
+        `INSERT INTO ports
+           (element_id, organization_id, port_index, fiber_count, colors, status)
+         VALUES ($1, $2, $3, 1, $4, 'unoccupied')
+         RETURNING id`,
+        [elementId, orgId, i, [getFiberName(i, colorScheme)]]
+      );
+      const portId = r.rows[0]?.id;
+      if (portId) portMap[i] = portId;
+    }
     portIdByKey[el.key] = portMap;
   }
 
-  const spliceRows: Array<{
-    port_from: string;
-    port_to: string;
-    organization_id: string;
-    comment: string | null;
-  }> = [];
   const occupiedPortIds: string[] = [];
   for (const s of template.splices) {
     const fromId = portIdByKey[s.fromKey]?.[s.fromPortIndex];
@@ -113,31 +101,36 @@ export async function applyTemplate(
         `applyTemplate.splice: missing port ${s.fromKey}#${s.fromPortIndex} or ${s.toKey}#${s.toPortIndex}`
       );
     }
-    spliceRows.push({
-      port_from: fromId,
-      port_to: toId,
-      organization_id: orgId,
-      comment: s.comment ?? null,
-    });
+    await runner.query(
+      `INSERT INTO splices (port_from, port_to, organization_id, comment)
+         VALUES ($1, $2, $3, $4)`,
+      [fromId, toId, orgId, s.comment ?? null]
+    );
     occupiedPortIds.push(fromId, toId);
   }
 
-  if (spliceRows.length > 0) {
-    const { error: spErr } = await supabase.from("splices").insert(spliceRows);
-    if (spErr) throw new Error(`applyTemplate.splices: ${spErr.message}`);
-
-    const { error: stErr } = await supabase
-      .from("ports")
-      .update({ status: "occupied" })
-      .in("id", occupiedPortIds)
-      .eq("organization_id", orgId);
-    if (stErr) throw new Error(`applyTemplate.portStatus: ${stErr.message}`);
+  if (occupiedPortIds.length > 0) {
+    await runner.query(
+      `UPDATE ports SET status = 'occupied'
+        WHERE id = ANY($1::uuid[]) AND organization_id = $2`,
+      [occupiedPortIds, orgId]
+    );
   }
 
   return {
-    bedsheetId: bs.id as string,
-    pageId: page.id as string,
+    bedsheetId: bsId,
+    pageId,
     elementCount: template.elements.length,
     spliceCount: template.splices.length,
   };
+}
+
+/** Convenience: applyTemplate using the shared pool (no explicit transaction). */
+export async function applyTemplateWithPool(
+  orgId: string,
+  projectId: string,
+  templateOrId: string | Template,
+  bedsheetName?: string
+): Promise<AppliedTemplate> {
+  return applyTemplate(pool as unknown as PgRunner, orgId, projectId, templateOrId, bedsheetName);
 }

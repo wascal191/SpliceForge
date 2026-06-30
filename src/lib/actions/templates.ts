@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { withTransaction, query } from "@/lib/db";
 import { requireAuthContext, requireRole } from "@/lib/guards";
 import { ProjectName, parseOrFail } from "@/lib/validation";
 import { z } from "zod";
@@ -38,29 +38,39 @@ export async function createProjectFromTemplate(
   const template = getTemplate(cleanTemplateId);
   if (!template) throw new Error("Unknown template");
 
-  const supabase = await createClient();
-
-  const { data: project, error: projErr } = await supabase
-    .from("projects")
-    .insert({ name: cleanName, description: cleanDesc, organization_id: ctx.orgId })
-    .select("id")
-    .single();
-  if (projErr || !project) fail("templates.createProjectFromTemplate", projErr, "Could not create project");
+  let projectId: string;
+  try {
+    const projectRow = await query<{ id: string }>(
+      `INSERT INTO projects (name, description, organization_id)
+         VALUES ($1, $2, $3)
+       RETURNING id`,
+      [cleanName, cleanDesc, ctx.orgId]
+    );
+    projectId = projectRow.rows[0]?.id;
+    if (!projectId) fail("templates.createProjectFromTemplate", new Error("no row"), "Could not create project");
+  } catch (e) {
+    fail("templates.createProjectFromTemplate", e, "Could not create project");
+  }
 
   let applied;
   try {
-    applied = await applyTemplate(supabase, ctx.orgId, project.id as string, template);
+    applied = await withTransaction((tx) =>
+      applyTemplate(tx, ctx.orgId, projectId, template)
+    );
   } catch (err) {
     // Roll back the project if seeding failed so the user doesn't end up with
-    // a half-built shell that violates their expectations of "from template".
-    await supabase.from("projects").delete().eq("id", project.id).eq("organization_id", ctx.orgId);
+    // a half-built shell.
+    await query(
+      `DELETE FROM projects WHERE id = $1 AND organization_id = $2`,
+      [projectId, ctx.orgId]
+    );
     throw err;
   }
 
   revalidatePath("/dashboard");
   revalidatePath(`/canvas/${applied.bedsheetId}`);
   return {
-    projectId: project.id as string,
+    projectId,
     bedsheetId: applied.bedsheetId,
     pageId: applied.pageId,
   };

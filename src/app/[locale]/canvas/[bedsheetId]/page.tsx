@@ -1,8 +1,20 @@
+import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import { getBedsheet } from "@/lib/actions/bedsheets";
 import { getPages } from "@/lib/actions/pages";
 import { CanvasLayout } from "@/components/canvas/CanvasLayout";
-import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { maybeOne } from "@/lib/db";
+
+type Page = {
+  id: string;
+  organization_id: string;
+  bedsheet_id: string;
+  page_index: number;
+  title: string | null;
+  data_json: Record<string, unknown> | null;
+  created_at: string;
+};
 
 export default async function CanvasPage({
   params,
@@ -11,8 +23,8 @@ export default async function CanvasPage({
 }) {
   const { bedsheetId } = await params;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth.api.getSession({ headers: await headers() });
+  const user = session?.user ?? null;
 
   let bedsheet;
   try {
@@ -20,37 +32,31 @@ export default async function CanvasPage({
   } catch {
     notFound();
   }
+  if (!bedsheet) notFound();
 
   let pages = await getPages(bedsheetId);
-  if (pages.length === 0) {
-    // First open of a fresh bedsheet — seed Page 1. We can't call the
-    // createPage server action here because it calls revalidatePath, which
-    // Next.js 16 forbids during server-component render. Direct insert is
-    // fine: getBedsheet above already confirmed the bedsheet is in the
-    // caller's org, so we trust bedsheet.organization_id.
-    const { data: newPage, error: seedErr } = await supabase
-      .from("pages")
-      .insert({
-        bedsheet_id: bedsheetId,
-        page_index: 0,
-        title: "Page 1",
-        organization_id: (bedsheet as { organization_id: string }).organization_id,
-      })
-      .select()
-      .single();
-    if (seedErr || !newPage) {
-      // eslint-disable-next-line no-console
+  if (!pages || pages.length === 0) {
+    const orgId = (bedsheet as { organization_id: string }).organization_id;
+    try {
+      const newPage = await maybeOne<Page>(
+        `INSERT INTO pages (bedsheet_id, page_index, title, organization_id)
+           VALUES ($1, 0, 'Page 1', $2)
+         RETURNING *`,
+        [bedsheetId, orgId]
+      );
+      if (!newPage) throw new Error("Insert returned no row");
+      pages = [newPage];
+    } catch (seedErr) {
       console.error("[canvas.page.seedFirstPage]", seedErr);
       throw new Error("Could not initialize bedsheet");
     }
-    pages = [newPage];
   }
 
   return (
     <CanvasLayout
       bedsheet={bedsheet}
       initialPages={pages}
-      userName={(user?.user_metadata?.full_name as string | undefined) ?? null}
+      userName={user?.name ?? null}
       userEmail={user?.email ?? null}
     />
   );

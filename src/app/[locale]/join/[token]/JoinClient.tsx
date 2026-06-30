@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import { joinOrganizationByToken } from "@/lib/actions/invites";
 
 const F = "var(--font-inter), sans-serif";
@@ -35,7 +35,6 @@ export function JoinClient({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [checkEmail, setCheckEmail] = useState(false);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -64,27 +63,20 @@ export function JoinClient({
       if (trimmedName.length < 1 || trimmedName.length > 120) throw new Error(tv("nameTooLong"));
       if (password.length < 8) throw new Error(tv("passwordTooShort"));
 
-      // Stamp locale so /auth/callback redirects to the correct prefix.
       document.cookie = `NEXT_LOCALE=${locale}; Path=/; Max-Age=31536000; SameSite=Lax`;
 
-      const supabase = createClient();
-      const { data, error: authError } = await supabase.auth.signUp({
+      const result = await authClient.signUp.email({
         email,
         password,
-        options: {
-          data: { full_name: trimmedName },
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/join/${encodeURIComponent(token)}`,
-        },
+        name: trimmedName,
       });
-      if (authError) throw authError;
-
-      if (data.session) {
-        await joinOrganizationByToken(token);
-        router.push("/dashboard");
-        router.refresh();
-      } else {
-        setCheckEmail(true);
+      if (result.error) {
+        throw new Error(result.error.message ?? "signup_failed");
       }
+
+      await joinOrganizationByToken(token);
+      router.push("/dashboard");
+      router.refresh();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -98,25 +90,6 @@ export function JoinClient({
     padding: "32px 28px",
     boxShadow: "0 0 0 1px rgba(61,245,163,0.04), 0 24px 64px rgba(0,0,0,0.6)",
   };
-
-  if (checkEmail) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#05070C", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ maxWidth: 400, width: "100%", padding: "0 24px", textAlign: "center" }}>
-          <div style={{ fontSize: 40, marginBottom: 20 }}>📬</div>
-          <h2 style={{ fontFamily: F, fontSize: 22, fontWeight: 700, color: "#F1F5F9", margin: "0 0 12px" }}>
-            {t("checkEmailTitle")}
-          </h2>
-          <p style={{ fontFamily: F, fontSize: 13.5, color: "#64748B", lineHeight: 1.6, margin: 0 }}>
-            {t.rich("checkEmailBody", {
-              email: () => <span style={{ color: "#00E5FF" }}>{email}</span>,
-              orgName: () => <strong style={{ color: "#F1F5F9" }}>{orgName}</strong>,
-            })}
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div style={{

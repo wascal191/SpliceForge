@@ -14,7 +14,7 @@ const MapView = dynamic(
 );
 import { createPage } from "@/lib/actions/pages";
 import { useCanvasStore } from "@/store/canvasStore";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { CanvasTour } from "@/components/onboarding/CanvasTour";
 import { LocaleSwitcher } from "@/components/locale-switcher";
@@ -157,8 +157,7 @@ function UserMenu({
   }, [open]);
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await authClient.signOut();
     router.push("/login");
     router.refresh();
   }

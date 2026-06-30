@@ -1,5 +1,6 @@
+import { headers } from "next/headers";
 import { validateInviteToken } from "@/lib/actions/invites";
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@/lib/auth";
 import { JoinClient } from "./JoinClient";
 
 export default async function JoinPage({
@@ -30,8 +31,8 @@ export default async function JoinPage({
     );
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await auth.api.getSession({ headers: await headers() });
+  const user = session?.user ?? null;
 
   return (
     <JoinClient
