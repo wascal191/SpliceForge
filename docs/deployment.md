@@ -185,18 +185,47 @@ Example systemd unit at `/etc/systemd/system/spliceforge.service`:
 ```ini
 [Unit]
 Description=SpliceForge
+# Wait for the network and (if Postgres is on the same host) the DB before starting.
+# If your Postgres runs on another machine, drop `postgresql.service` from both lines.
 After=network.target postgresql.service
+Wants=postgresql.service
 
 [Service]
 Type=simple
+# The unprivileged system user that owns /opt/spliceforge. Create it once with:
+#   sudo useradd --system --home /opt/spliceforge --shell /usr/sbin/nologin spliceforge
+#   sudo chown -R spliceforge:spliceforge /opt/spliceforge
 User=spliceforge
+Group=spliceforge
+
+# Absolute path to the checkout. Change if you cloned somewhere other than /opt/spliceforge.
 WorkingDirectory=/opt/spliceforge
+
+# File that carries DATABASE_URL, BETTER_AUTH_SECRET, NEXT_PUBLIC_SITE_URL, etc.
+# Recommended perms:  sudo chown root:spliceforge /etc/spliceforge.env && sudo chmod 640 /etc/spliceforge.env
 EnvironmentFile=/etc/spliceforge.env
-ExecStart=/usr/bin/node .next/standalone/server.js
+Environment=NODE_ENV=production
+# Port the Node process listens on. Match this to your reverse-proxy upstream (see §5.3).
+Environment=PORT=7000
+
+# Path to the Node/npm binary. Confirm with `which node` / `which npm`.
+# If you use nvm, point directly at the versioned binary (e.g. /home/spliceforge/.nvm/versions/node/v20.x.x/bin/node)
+# because systemd does not inherit your login shell's PATH.
+# Option A (works with the default next.config.ts): use `npm start`
+ExecStart=/usr/bin/npm start
+# Option B (smaller footprint): requires `output: "standalone"` in next.config.ts,
+# plus copying public/ and .next/static/ into .next/standalone/ after each build.
+# ExecStart=/usr/bin/node .next/standalone/server.js
+
 Restart=on-failure
 RestartSec=5
+
+# Hardening — safe defaults; loosen only if you know why.
 NoNewPrivileges=true
+PrivateTmp=true
 ProtectSystem=strict
+ProtectHome=true
+# The Next.js build/runtime writes into .next/cache. Keep this pointed at your WorkingDirectory's .next.
 ReadWritePaths=/opt/spliceforge/.next
 
 [Install]

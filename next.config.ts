@@ -18,7 +18,7 @@ const tileHosts = [
 
 const csp = [
   "default-src 'self'",
-  isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self'",
+  isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   // blob: needed for MapLibre raster tile workers; tile CDNs for raster sprites/glyphs
   `img-src 'self' data: blob: ${tileHosts}`,
