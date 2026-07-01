@@ -935,7 +935,7 @@ function FiberCanvasInner({ pageId, bedsheetId, pages, onPageChange }: Props) {
     }
   }, [setEdges]);
 
-  const onNodeDragStop: OnNodeDrag = useCallback(async (_event: React.MouseEvent, _node: Node, nodes: Node[]) => {
+  const onNodeDragStop: OnNodeDrag = useCallback(async (_event, _node, nodes) => {
     try {
       await Promise.all(nodes.map((n) => updateElement(n.id, { position_x: n.position.x, position_y: n.position.y })));
     } catch (err) {
