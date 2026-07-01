@@ -22,6 +22,7 @@
 .idea/
 .vscode/
 .vs/
+.claude/
 
 # Debug
 npm-debug.log*

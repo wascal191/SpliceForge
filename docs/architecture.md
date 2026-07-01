@@ -28,27 +28,34 @@ This document describes the technical design of SpliceForge for developers worki
 
 ```
 SpliceForge/
+├── db/
+│   └── schema.sql              # Vanilla Postgres schema — run via `npm run db:init`
+│
 ├── src/
-│   ├── app/                    # Next.js App Router pages
+│   ├── app/                    # Next.js App Router pages (locale-prefixed)
 │   │   ├── layout.tsx          # Root layout — Inter + Geist Mono fonts, Providers wrapper
 │   │   ├── globals.css         # Tailwind v4 theme, FM color tokens, animations, ReactFlow overrides
-│   │   ├── page.tsx            # Landing page
-│   │   ├── dashboard/
-│   │   │   └── page.tsx        # Server component: fetches projects
-│   │   ├── canvas/
-│   │   │   └── [bedsheetId]/
-│   │   │       └── page.tsx    # Server component: loads bedsheet + pages
-│   │   ├── login/
-│   │   │   └── page.tsx        # Email + password sign-in
-│   │   ├── signup/
-│   │   │   └── page.tsx        # New account registration
-│   │   ├── auth/
-│   │   │   └── callback/
-│   │   │       └── route.ts    # Supabase OAuth / magic-link callback handler
-│   │   └── join/
-│   │       └── page.tsx        # Accept organization invite by token (/join?token=<hex>)
+│   │   ├── [locale]/
+│   │   │   ├── page.tsx        # Landing page
+│   │   │   ├── demo/           # Anonymous read-only canvas preview (no account)
+│   │   │   ├── dashboard/
+│   │   │   │   └── page.tsx    # Server component: fetches projects, auto-provisions org on first load
+│   │   │   ├── canvas/
+│   │   │   │   └── [bedsheetId]/
+│   │   │   │       └── page.tsx    # Server component: loads bedsheet + pages
+│   │   │   ├── login/
+│   │   │   │   └── page.tsx    # Email + password sign-in
+│   │   │   ├── signup/
+│   │   │   │   └── page.tsx    # New account registration
+│   │   │   └── join/
+│   │   │       └── [token]/
+│   │   │           └── page.tsx    # Accept organization invite by token
+│   │   └── api/
+│   │       └── auth/
+│   │           └── [...all]/
+│   │               └── route.ts    # Better Auth catch-all (sign-in, sign-up, sign-out, session)
 │   │
-│   ├── middleware.ts           # Auth guard: redirects unauthenticated users to /login
+│   ├── proxy.ts                # Next.js 16 middleware: session gate + i18n locale routing
 │   │
 │   ├── components/
 │   │   ├── canvas/             # Canvas-level UI components
@@ -84,16 +91,22 @@ SpliceForge/
 │   │   │   ├── projects.ts     # Project CRUD
 │   │   │   ├── library.ts      # Cable library CRUD
 │   │   │   ├── bedsheets.ts    # Bedsheet management
-│   │   │   ├── organizations.ts  # Org CRUD, member management, invite by email
-│   │   │   └── invites.ts        # Token-based invite link create/validate/join
+│   │   │   ├── organizations.ts  # Org CRUD, member management (all app-level filtered by org_id)
+│   │   │   ├── invites.ts        # Token-based invite link create/validate/join
+│   │   │   ├── templates.ts      # Create project from a pre-built template
+│   │   │   └── import.ts         # Bulk import (elements + ports + splices) via import_bundle RPC
 │   │   ├── fiber/              # Fiber domain utilities
 │   │   │   ├── colors.ts       # EIA-598, ABNT, and other color scheme tables
 │   │   │   ├── trace.ts        # BFS trace logic
 │   │   │   └── comments.ts     # Splice comment helpers
-│   │   └── supabase/           # Supabase client initialization
-│   │       ├── server.ts       # SSR client (cookie-based, anon key) — for Server Actions
-│   │       ├── client.ts       # Browser client (anon key) — for client components
-│   │       └── admin.ts        # Admin client (service role key) — bypasses RLS; server-only
+│   │   ├── templates/          # Seedable project templates (FTTH, contractor splice)
+│   │   ├── db.ts               # pg Pool + query/rows/maybeOne/withTransaction helpers
+│   │   ├── auth.ts             # Better Auth server instance
+│   │   ├── auth-client.ts      # Better Auth React client (signIn/signUp/signOut/useSession)
+│   │   ├── guards.ts           # requireAuthContext, assertOrgOwnsRow(s), role checks
+│   │   ├── validation.ts       # Zod schemas for every server-action input
+│   │   ├── errors.ts           # fail() helper: logs full DB error, throws generic public message
+│   │   └── ratelimit.ts        # Token-bucket rate limiter (in-memory or Upstash)
 │   │
 │   ├── store/
 │   │   └── canvasStore.ts      # Zustand global canvas state
@@ -101,15 +114,17 @@ SpliceForge/
 │   └── types/
 │       └── fiber.ts            # TypeScript types and interfaces
 │
+├── scripts/
+│   └── db-init.mjs             # Cross-platform runner for `npm run db:init`
 ├── public/                     # Static assets
 ├── docs/                       # Documentation
 │   ├── architecture.md         # This file
 │   ├── data-model.md           # TypeScript types + DB schema summary
-│   ├── sql-schema.sql          # Full SQL DDL — run on a fresh Supabase project
 │   ├── deployment.md           # Environment setup, deployment, troubleshooting
 │   ├── fiber-standards.md      # Fiber color coding standards reference
 │   ├── keyboard-shortcuts.md   # Keyboard shortcut reference
 │   └── user-guide.md           # End-user feature documentation
+├── messages/                   # next-intl JSON dictionaries (en, es, pt-br)
 ├── package.json
 └── next.config.ts
 ```
@@ -122,17 +137,20 @@ SpliceForge is a **Next.js 16 App Router** application with React 19.
 
 ### Page Routing
 
+All app routes are prefixed with a locale (`en`, `es`, `pt-br`) resolved by next-intl.
+
 | Route | Component | Purpose |
 |---|---|---|
-| `/` | `app/page.tsx` | Landing page |
-| `/dashboard` | `app/dashboard/page.tsx` | Project management |
-| `/canvas/[bedsheetId]` | `app/canvas/[bedsheetId]/page.tsx` | Canvas editor |
-| `/login` | `app/login/page.tsx` | Email + password sign-in |
-| `/signup` | `app/signup/page.tsx` | New account registration |
-| `/auth/callback` | `app/auth/callback/route.ts` | Supabase OAuth / magic-link callback |
-| `/join` | `app/join/page.tsx` | Accept organization invite by token |
+| `/[locale]/` | `app/[locale]/page.tsx` | Landing page |
+| `/[locale]/demo` | `app/[locale]/demo/page.tsx` | Anonymous read-only canvas preview |
+| `/[locale]/dashboard` | `app/[locale]/dashboard/page.tsx` | Project management |
+| `/[locale]/canvas/[bedsheetId]` | `app/[locale]/canvas/[bedsheetId]/page.tsx` | Canvas editor |
+| `/[locale]/login` | `app/[locale]/login/page.tsx` | Email + password sign-in |
+| `/[locale]/signup` | `app/[locale]/signup/page.tsx` | New account registration |
+| `/[locale]/join/[token]` | `app/[locale]/join/[token]/page.tsx` | Accept organization invite by token |
+| `/api/auth/[...all]` | `app/api/auth/[...all]/route.ts` | Better Auth catch-all (sign-in, sign-up, session, sign-out) |
 
-All routes under `/dashboard` and `/canvas` are protected by `middleware.ts` — unauthenticated requests redirect to `/login`.
+All routes under `/dashboard` and `/canvas` are protected by `src/proxy.ts` — unauthenticated requests redirect to `/login`. `/demo` is intentionally public.
 
 ### Server vs. Client Components
 
@@ -419,43 +437,78 @@ traceFromPort(startPortId, nodes, edges):
 
 ### Overview
 
-Authentication is handled by **Supabase Auth** (email + password). Session cookies are managed by `@supabase/ssr` via the Next.js middleware pattern.
+Authentication is handled by **Better Auth** with email + password credentials and cookie-based sessions. Sessions are persisted in the `"session"` table in Postgres — nothing runs on a third-party auth service.
 
-### Middleware (`src/middleware.ts`)
+### Middleware (`src/proxy.ts`)
 
-Runs on every request matching `/((?!_next/static|_next/image|favicon.ico|.*\\....)`.
+Runs on every request matching `/((?!_next/static|_next/image|favicon.ico|.*\\....)`. Combines next-intl locale routing with the session gate:
 
-- If the route starts with `/dashboard` or `/canvas` and there is no valid session → redirect to `/login`.
-- If the route is `/login`, `/signup`, or `/auth/...` and there IS a valid session → redirect to `/dashboard`.
+- Requests to `/api/auth/*` bypass locale rewriting and the auth gate (Better Auth handles its own).
+- Reads the current session via `auth.api.getSession({ headers: request.headers })`.
+- If the route starts with `/dashboard` or `/canvas` and there is no valid session → redirect to `/[locale]/login`.
+- If the route is `/login` or `/signup` and there IS a valid session → redirect to `/[locale]/dashboard`.
 
-### Supabase Clients
+### Auth modules
 
-| File | Client Type | Key Used | Purpose |
-|---|---|---|---|
-| `src/lib/supabase/server.ts` | SSR client (cookie-based) | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Server components and Server Actions |
-| `src/lib/supabase/client.ts` | Browser client | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client components (login form) |
-| `src/lib/supabase/admin.ts` | Admin client | `SUPABASE_SERVICE_ROLE_KEY` | Org/member/invite operations; bypasses RLS |
+| File | Purpose |
+|---|---|
+| `src/lib/auth.ts` | Server-side `betterAuth({...})` instance. Reads `DATABASE_URL` (via the shared `pg` Pool) and `BETTER_AUTH_SECRET`. Email verification is off by default. |
+| `src/lib/auth-client.ts` | Client-side `createAuthClient()` from `better-auth/react` — exports `signIn`, `signUp`, `signOut`, `useSession`. |
+| `src/app/api/auth/[...all]/route.ts` | Catch-all route handler — `export const { GET, POST } = toNextJsHandler(auth)`. |
+| `src/lib/guards.ts` | `requireAuthContext()` reads the session server-side, joins `organization_members`, and returns `{ userId, orgId, role }` used by every server action. |
 
-### Organization Flow
+### Session shape
 
-1. After signing up, a user creates or joins an organization.
-2. `getCurrentOrganization()` is called to hydrate `canvasStore.currentOrganization`.
-3. An owner can invite others by email (`inviteUserByEmail`) or by shareable link (`createInviteToken`).
-4. Invite links point to `/join?token=<hex>`. Visiting that route calls `joinOrganizationByToken()`, which adds the user as an `editor`.
-5. A hard cap of 5 members per organization is enforced in `inviteMember()` (configurable in `src/lib/actions/organizations.ts`).
+Better Auth stores session cookies under an HTTP-only, `SameSite=Lax` cookie. Session records live in Postgres:
+
+```
+"session"
+├── id           TEXT PK
+├── userId       TEXT → "user"(id)
+├── token        TEXT UNIQUE
+├── expiresAt    TIMESTAMP
+├── ipAddress    TEXT
+└── userAgent    TEXT
+```
+
+Signing out (`authClient.signOut()`) deletes the row.
+
+### Organization flow
+
+1. Signup calls `authClient.signUp.email({ email, password, name })` — Better Auth creates rows in `"user"` and `"session"`.
+2. The signup client then calls `createOrganization(orgName)` (Server Action), which invokes the `create_org_with_owner(name, user_id)` RPC atomically. If it succeeds, the user is added as `owner`.
+3. Dashboard recovery: if the user reaches `/dashboard` without an organization (e.g. `createOrganization` failed on a flaky signup), `dashboard/page.tsx` provisions one silently and seeds the FTTH demo project.
+4. Invite flow is token-based only (no email transport required). Owners call `createInviteToken()`; the raw token is shown once. Recipients open `/join/<token>`; `joinOrganizationByToken()` calls the `consume_invite_token` RPC, which atomically checks the cap and inserts a member row.
+5. Per-org member cap comes from `MAX_MEMBERS_PER_ORG` (defaults to 5). The RPC also has its own `v_max_members` constant — keep them aligned.
 
 ---
 
 ## 8. Backend & Database
 
-SpliceForge uses **Supabase** (PostgreSQL). The complete SQL DDL is in `docs/sql-schema.sql`.
+SpliceForge uses **vanilla PostgreSQL 13+** via the `pg` driver. The single source of truth for the schema is [`db/schema.sql`](../db/schema.sql), applied with `npm run db:init`.
+
+The only extension used is `pgcrypto` (for `gen_random_uuid()`). No Postgres extensions specific to any hosting provider are required.
+
+### DB client (`src/lib/db.ts`)
+
+```ts
+export const pool: Pool;                                    // shared connection pool (HMR-safe singleton)
+export function query<T>(text: string, params?: unknown[]): Promise<QueryResult<T>>;
+export function rows<T>(text: string, params?: unknown[]): Promise<T[]>;
+export function maybeOne<T>(text: string, params?: unknown[]): Promise<T | null>;
+export function withTransaction<T>(fn: (tx: { query: ... }) => Promise<T>): Promise<T>;
+```
+
+All parameters are `$1, $2, ...` positional placeholders — never string-interpolate user input. `withTransaction` wraps the callback in `BEGIN ... COMMIT` and rolls back on any thrown error.
 
 ### Table Summary
 
 ```
+"user", "session", "account", "verification"   — Owned by Better Auth (quoted, camelCase columns)
+
 organizations           — Tenant container (one per company)
-organization_members    — User ↔ organization with role
-organization_invites    — Shareable invite link tokens
+organization_members    — User ↔ organization with role (owner | editor | viewer)
+organization_invites    — Shareable invite link tokens (SHA-256 hashed)
 
 projects                — Top-level logical container
   └── bedsheets         — Named set of pages
@@ -464,15 +517,37 @@ projects                — Top-level logical container
                     └── ports  — Connectable fiber endpoints
                           └── splices  — Connections between ports
 
-library_cables          — Saved cable configurations (user-scoped)
+library_cables          — Saved cable configurations (org-scoped)
 ```
+
+### Multi-tenant isolation (app-level)
+
+There is **no RLS**. Every server-action query filters by `organization_id = ctx.orgId`, where `ctx` comes from `requireAuthContext()` in `src/lib/guards.ts`. Reviewers should verify this filter on every new query — there is no DB-level backstop.
+
+Helpers in `guards.ts`:
+
+- `requireAuthContext()` — resolves the user's session (via Better Auth) and their org membership.
+- `assertOrgOwnsRow(table, id, orgId)` and `assertOrgOwnsRows(table, ids, orgId)` — confirm rows exist within the caller's org before an update/delete. Table names are validated against a whitelist to prevent injection.
+- `requireRole(ctx, allowed)` — enforce role gates for owner-only or editor+ actions.
 
 ### Data Flow
 
 1. **Page load:** Server component calls `getPages(bedsheetId)`. `FiberCanvas` calls `getElements(pageId)` → `getPortsByElements(elementIds)` → `getSplicesByPortIds(portIds)`.
-2. **Port fetching is paginated** — `getPortsByElements` loops in 1000-row pages; no hard cap.
+2. **Port fetching is paginated** — `getPortsByElements` returns via a single `WHERE element_id = ANY($1)` query; the app orders by `port_index`.
 3. **Mutations** go through Server Actions and return the updated record.
 4. **React state** is updated only after the server action resolves.
+
+### RPCs
+
+The three stored procedures are plain PL/pgSQL and defined in [`db/schema.sql`](../db/schema.sql):
+
+| RPC | Purpose |
+|---|---|
+| `create_org_with_owner(p_name, p_user_id)` | Atomically insert an org + owner-member row. |
+| `consume_invite_token(p_token_hash, p_user_id)` | Row-lock the invite, check expiry/cap, insert membership, decrement uses. |
+| `import_bundle(p_page_id, p_payload, p_user_id)` | Ingest a full elements + ports + splices payload from the importer, all in one transaction. |
+
+All three take `p_user_id TEXT` as an explicit parameter — none of them read from an implicit session variable.
 
 ---
 
@@ -519,13 +594,12 @@ All database mutations use **Next.js Server Actions** (`"use server"`) in `src/l
 
 | Action | Description |
 |---|---|
-| `createOrganization(name)` | Create org + add caller as `owner` |
-| `getCurrentOrganization()` | Fetch the org of the current user |
-| `getOrgMembers()` | List all members with email/name from auth.users |
-| `getCurrentUserRole()` | Return `'owner'` \| `'editor'` \| `null` |
-| `inviteMember(email, role)` | Send Supabase invite email; enforces 5-user cap |
+| `createOrganization(name)` | Call `create_org_with_owner` RPC — atomic org + owner-member insert |
+| `getCurrentOrganization()` | Fetch the org of the current user (JOIN through `organization_members`) |
+| `getOrgMembers()` | List all members joined against the Better Auth `"user"` table for email/name |
+| `getCurrentUserRole()` | Return `'owner'` \| `'editor'` \| `'viewer'` \| `null` |
 | `updateMemberRole(memberId, role)` | Change a member's role |
-| `removeMember(memberId)` | Remove a member from the organization |
+| `removeMember(memberId)` | Remove a member (blocks self-removal and last-owner removal) |
 
 ### invites.ts
 

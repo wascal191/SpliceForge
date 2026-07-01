@@ -1,6 +1,6 @@
 # SpliceForge — Data Model Reference
 
-This document describes the TypeScript types used in SpliceForge and the underlying Supabase database schema.
+This document describes the TypeScript types used in SpliceForge and the underlying PostgreSQL database schema.
 
 ---
 
@@ -30,7 +30,7 @@ Represents a single connectable port on any node.
 
 ```typescript
 type FiberPort = {
-  id: string           // Supabase UUID
+  id: string           // Postgres UUID (gen_random_uuid())
   elementId: string    // Parent node ID
   portIndex: number    // 0-based position (maps to fiber number)
   colors: string[]     // Hex color values from the color scheme
@@ -157,43 +157,61 @@ type FiberEdge = Edge<SpliceEdgeData, "splice">
 
 ## 2. Database Schema
 
-SpliceForge uses Supabase (PostgreSQL). The full SQL DDL with indexes, constraints, and RLS policies is in `docs/sql-schema.sql`. Below is a human-readable summary.
+SpliceForge uses **vanilla PostgreSQL 13+**. The full DDL with indexes and constraints lives in [`db/schema.sql`](../db/schema.sql); apply it with `npm run db:init`. Below is a human-readable summary.
+
+Multi-tenant isolation is enforced at the application layer — every server-action query filters by `organization_id`. There are **no RLS policies** and no vendor-specific auth schema.
+
+### Better Auth tables
+
+Better Auth owns four tables (quoted, singular names with camelCase columns). SpliceForge does not modify their rows directly except via Better Auth's own APIs.
+
+| Table | Purpose |
+|---|---|
+| `"user"` | One row per registered account. Primary key `id TEXT` — Better Auth uses cuid-like strings, not UUIDs. |
+| `"session"` | Active session cookies. Deleted on sign-out or expiry. |
+| `"account"` | Password hashes + OAuth linkage (currently email/password only). |
+| `"verification"` | Email-verification tokens (only used if `requireEmailVerification: true`). |
+
+See the exact columns in `db/schema.sql` § SECTION 1.
 
 ### organizations
 
-Top-level tenant container. One per company.
+Top-level tenant container.
 
 | Column | Type | Description |
 |---|---|---|
 | `id` | `uuid` PRIMARY KEY | Auto-generated |
-| `name` | `text` NOT NULL | Company/team name |
-| `plan` | `text` NOT NULL DEFAULT `'trial'` | `'trial'` \| `'pro'` \| `'enterprise'` |
-| `api_base_url` | `text` | Optional custom API endpoint |
+| `name` | `text` NOT NULL | Organization display name |
+| `api_base_url` | `text` | Optional custom API endpoint (reserved) |
 | `created_at` | `timestamptz` | Auto-set on insert |
 
 ### organization_members
 
-Maps Supabase auth users to an organization with a role.
+Links Better Auth users to an organization with a role.
 
 | Column | Type | Description |
 |---|---|---|
 | `id` | `uuid` PRIMARY KEY | Auto-generated |
-| `organization_id` | `uuid` FK → organizations.id | Parent organization |
-| `user_id` | `uuid` FK → auth.users.id | Supabase auth user |
+| `organization_id` | `uuid` FK → organizations.id | Parent organization (CASCADE delete) |
+| `user_id` | `text` FK → `"user"`(id) | Better Auth user id (TEXT, not UUID) |
 | `role` | `text` NOT NULL DEFAULT `'editor'` | `'owner'` \| `'editor'` \| `'viewer'` |
 | `created_at` | `timestamptz` | Auto-set on insert |
+|  | UNIQUE `(organization_id, user_id)` | Prevents duplicate memberships |
 
 ### organization_invites
 
-One active invite link per organization.
+Shareable invite tokens for an organization. The raw token is returned exactly once at creation; only the SHA-256 hash is persisted.
 
 | Column | Type | Description |
 |---|---|---|
 | `id` | `uuid` PRIMARY KEY | Auto-generated |
-| `organization_id` | `uuid` FK → organizations.id | Parent organization |
-| `token` | `text` UNIQUE NOT NULL | 64-char hex token (crypto.randomBytes) |
-| `created_by` | `uuid` FK → auth.users.id | User who generated the link |
+| `organization_id` | `uuid` FK → organizations.id | Parent organization (CASCADE delete) |
+| `token_hash` | `text` UNIQUE NOT NULL | SHA-256 of the raw 32-byte token |
+| `created_by` | `text` FK → `"user"`(id) | User who generated the link |
 | `created_at` | `timestamptz` | Auto-set on insert |
+| `expires_at` | `timestamptz` NOT NULL | 7 days from creation by default |
+| `uses` | `integer` NOT NULL DEFAULT `0` | Increments on each `consume_invite_token` call |
+| `max_uses` | `integer` NOT NULL DEFAULT `5` | Auto-set to `MAX_MEMBERS_PER_ORG` |
 
 ### projects
 
@@ -316,7 +334,7 @@ User-saved cable configurations.
 When a page is loaded, the data goes through this transformation:
 
 ```
-Supabase
+PostgreSQL
   ├── elements rows          ──→  React Flow Node[]
   ├── ports rows             ──→  node.data.ports[]
   └── splices rows           ──→  React Flow Edge[]

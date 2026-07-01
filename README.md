@@ -13,8 +13,10 @@ An **open-source** canvas editor for fiber-optic networks. SpliceForge provides 
 |---|---|
 | [User Guide](docs/user-guide.md) | Complete walkthrough of all features and workflows |
 | [Keyboard Shortcuts](docs/keyboard-shortcuts.md) | Quick reference for all keyboard shortcuts |
+| [Self-Hosting & Deployment](docs/deployment.md) | Local dev, production self-hosting, troubleshooting |
 | [Architecture](docs/architecture.md) | Technical architecture for developers |
 | [Data Model](docs/data-model.md) | TypeScript types and database schema explained |
+| [Pre-Launch Checklist](docs/pre-launch-checklist.md) | Blockers to clear before opening a public deployment |
 | [Fiber Color Standards](docs/fiber-standards.md) | EIA-598, ABNT, and other supported color standards |
 | [Contributing](CONTRIBUTING.md) | How to set up locally and submit changes |
 | [Roadmap](ROADMAP.md) | What's in flight and where help is wanted |

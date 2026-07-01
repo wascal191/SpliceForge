@@ -29,21 +29,23 @@ If those terms don't fit your use case, please open a discussion before investin
 
 ## Getting the project running locally
 
-**Prerequisites:** Node.js 18+ (20 recommended), a Supabase project (free tier works).
+**Prerequisites:** Node.js 20 LTS, npm 10+, PostgreSQL 13+ (vanilla — any distribution).
 
 ```bash
 git clone https://github.com/wascal191/SpliceForge.git
 cd SpliceForge
 npm install
-cp .env.local.example .env.local   # then fill in your Supabase keys
+cp .env.local.example .env.local   # then edit values (DATABASE_URL, BETTER_AUTH_SECRET)
+createdb spliceforge                # or use Docker: see docs/deployment.md § 3.1
+npm run db:init                     # applies db/schema.sql
 npm run dev
 ```
 
-The app runs on http://localhost:7000.
+The app runs on http://localhost:7000. Visit `/demo` if you want to poke at the canvas without signing up.
 
-For local development you can disable email confirmation in `supabase/config.toml` (set `enable_confirmations = false`) so signup is one-click. Or skip signup entirely by visiting `/demo` — no account required.
+Email verification is off by default so you can sign up in one click. Full setup + troubleshooting is in [docs/deployment.md](docs/deployment.md).
 
-**Database schema:** see [docs/sql-schema.sql](docs/sql-schema.sql). Migration files live in [docs/migrations/](docs/migrations/).
+**Database schema:** single source of truth is [db/schema.sql](db/schema.sql). It's idempotent — safe to re-apply after every pull.
 
 **Architecture overview:** [docs/architecture.md](docs/architecture.md).
 
